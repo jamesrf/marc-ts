@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>marc-ts Browser Example</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      background: #f5f5f5;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    h1 {
+      color: #2c3e50;
+      margin-bottom: 10px;
+      font-size: 28px;
+    }
+
+    .subtitle {
+      color: #7f8c8d;
+      margin-bottom: 30px;
+      font-size: 14px;
+    }
+
+    .upload-section {
+      margin-bottom: 30px;
+      padding: 20px;
+      background: #ecf0f1;
+      border-radius: 6px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 10px;
+      font-weight: 600;
+      color: #34495e;
+    }
+
+    input[type="file"] {
+      display: block;
+      width: 100%;
+      padding: 10px;
+      border: 2px dashed #bdc3c7;
+      border-radius: 4px;
+      background: white;
+      cursor: pointer;
+      transition: border-color 0.3s;
+    }
+
+    input[type="file"]:hover {
+      border-color: #3498db;
+    }
+
+    .output {
+      background: #f8f9fa;
+      border: 1px solid #dee2e6;
+      border-radius: 4px;
+      padding: 20px;
+      font-family: 'Courier New', monospace;
+      font-size: 14px;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      max-height: 500px;
+      overflow-y: auto;
+    }
+
+    .output.empty {
+      color: #95a5a6;
+      font-style: italic;
+    }
+
+    .field-group {
+      margin-bottom: 15px;
+      padding-bottom: 15px;
+      border-bottom: 1px solid #e0e0e0;
+    }
+
+    .field-group:last-child {
+      border-bottom: none;
+    }
+
+    .field-label {
+      font-weight: 600;
+      color: #2c3e50;
+      margin-bottom: 5px;
+    }
+
+    .field-value {
+      color: #34495e;
+    }
+
+    .warning {
+      background: #fff3cd;
+      border: 1px solid #ffc107;
+      border-radius: 4px;
+      padding: 15px;
+      margin-top: 20px;
+    }
+
+    .warning-title {
+      font-weight: 600;
+      color: #856404;
+      margin-bottom: 10px;
+    }
+
+    .warning-item {
+      color: #856404;
+      margin-bottom: 5px;
+      font-size: 13px;
+    }
+
+    .error {
+      background: #f8d7da;
+      border: 1px solid #f5c6cb;
+      border-radius: 4px;
+      padding: 15px;
+      color: #721c24;
+    }
+
+    footer {
+      margin-top: 30px;
+      padding-top: 20px;
+      border-top: 1px solid #e0e0e0;
+      text-align: center;
+      color: #7f8c8d;
+      font-size: 14px;
+    }
+
+    footer a {
+      color: #3498db;
+      text-decoration: none;
+    }
+
+    footer a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>marc-ts Browser Example</h1>
+    <p class="subtitle">Parse MARC21 binary files directly in your browser</p>
+
+    <div class="upload-section">
+      <label for="fileInput">Select a MARC21 file (.mrc):</label>
+      <input type="file" id="fileInput" accept=".mrc,.marc,.dat" />
+    </div>
+
+    <div id="output" class="output empty">
+      No file selected. Please choose a MARC21 binary file to parse.
+    </div>
+
+    <footer>
+      <p>
+        Powered by <a href="https://github.com/yourusername/marc-ts" target="_blank">marc-ts</a>
+        &bull; A TypeScript MARC21 library with Perl MARC::Record API compatibility
+      </p>
+    </footer>
+  </div>
+
+  <script type="module">
+    // Import marc-ts functions
+    // Note: In production, use a CDN or your bundled version
+    import {
+      parseMarcRecord,
+      title,
+      titleProper,
+      author,
+      edition,
+      publisher,
+      publicationDate,
+      isbn,
+      issn,
+      lccn,
+      subjects,
+      seriesStatement,
+      getField,
+    } from '../dist/index.js';
+
+    const fileInput = document.getElementById('fileInput');
+    const output = document.getElementById('output');
+
+    fileInput.addEventListener('change', async (event) => {
+      const file = event.target.files[0];
+
+      if (!file) {
+        output.className = 'output empty';
+        output.textContent = 'No file selected. Please choose a MARC21 binary file to parse.';
+        return;
+      }
+
+      try {
+        // Read file as ArrayBuffer
+        const arrayBuffer = await file.arrayBuffer();
+        const buffer = new Uint8Array(arrayBuffer);
+
+        // Parse MARC record
+        const result = parseMarcRecord(buffer);
+
+        if (!result.record) {
+          output.className = 'output error';
+          output.innerHTML = `
+            <strong>Failed to parse MARC record</strong>
+            <p>The file could not be parsed as a valid MARC21 record.</p>
+            ${result.warnings.length > 0 ? `
+              <div style="margin-top: 10px;">
+                <strong>Errors:</strong>
+                ${result.warnings.map(w => `<div>• ${w.message}</div>`).join('')}
+              </div>
+            ` : ''}
+          `;
+          return;
+        }
+
+        const record = result.record;
+
+        // Display parsed metadata
+        output.className = 'output';
+        output.innerHTML = `
+          <div class="field-group">
+            <div class="field-label">Title:</div>
+            <div class="field-value">${escapeHtml(title(record) || 'N/A')}</div>
+          </div>
+
+          <div class="field-group">
+            <div class="field-label">Title Proper:</div>
+            <div class="field-value">${escapeHtml(titleProper(record) || 'N/A')}</div>
+          </div>
+
+          <div class="field-group">
+            <div class="field-label">Author:</div>
+            <div class="field-value">${escapeHtml(author(record) || 'N/A')}</div>
+          </div>
+
+          <div class="field-group">
+            <div class="field-label">Edition:</div>
+            <div class="field-value">${escapeHtml(edition(record) || 'N/A')}</div>
+          </div>
+
+          <div class="field-group">
+            <div class="field-label">Publisher:</div>
+            <div class="field-value">${escapeHtml(publisher(record) || 'N/A')}</div>
+          </div>
+
+          <div class="field-group">
+            <div class="field-label">Publication Date:</div>
+            <div class="field-value">${escapeHtml(publicationDate(record) || 'N/A')}</div>
+          </div>
+
+          <div class="field-group">
+            <div class="field-label">ISBN(s):</div>
+            <div class="field-value">${isbn(record).length > 0 ? escapeHtml(isbn(record).join(', ')) : 'N/A'}</div>
+          </div>
+
+          <div class="field-group">
+            <div class="field-label">ISSN:</div>
+            <div class="field-value">${escapeHtml(issn(record) || 'N/A')}</div>
+          </div>
+
+          <div class="field-group">
+            <div class="field-label">LCCN:</div>
+            <div class="field-value">${escapeHtml(lccn(record) || 'N/A')}</div>
+          </div>
+
+          <div class="field-group">
+            <div class="field-label">Subjects:</div>
+            <div class="field-value">${subjects(record).length > 0 ? escapeHtml(subjects(record).join('; ')) : 'N/A'}</div>
+          </div>
+
+          <div class="field-group">
+            <div class="field-label">Series Statement:</div>
+            <div class="field-value">${escapeHtml(seriesStatement(record) || 'N/A')}</div>
+          </div>
+
+          <div class="field-group">
+            <div class="field-label">Leader:</div>
+            <div class="field-value">${escapeHtml(record.leader)}</div>
+          </div>
+
+          <div class="field-group">
+            <div class="field-label">Total Fields:</div>
+            <div class="field-value">${record.fields.length}</div>
+          </div>
+
+          ${result.warnings.length > 0 ? `
+            <div class="warning">
+              <div class="warning-title">⚠ Parsing Warnings (${result.warnings.length})</div>
+              ${result.warnings.map(w => `<div class="warning-item">• ${escapeHtml(w.message)}</div>`).join('')}
+            </div>
+          ` : ''}
+        `;
+
+      } catch (error) {
+        output.className = 'output error';
+        output.innerHTML = `
+          <strong>Error:</strong>
+          <p>${escapeHtml(error.message || 'An unknown error occurred')}</p>
+        `;
+      }
+    });
+
+    // Utility function to escape HTML
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+  </script>
+</body>
+</html>
