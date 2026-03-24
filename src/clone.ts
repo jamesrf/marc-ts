@@ -19,26 +19,32 @@ import { isControlField } from './types';
  * ```
  */
 export function cloneRecord(record: MarcRecord): MarcRecord {
-  return {
-    leader: record.leader,
-    fields: record.fields.map((field) => cloneField(field)),
-  };
-}
+  // Optimized: Pre-allocate arrays for better performance
+  const fields = new Array<ControlField | DataField>(record.fields.length);
 
-/**
- * Clone a single field (control or data field).
- */
-function cloneField(field: ControlField | DataField): ControlField | DataField {
-  if (isControlField(field)) {
-    return { tag: field.tag, data: field.data };
+  for (let i = 0; i < record.fields.length; i++) {
+    const field = record.fields[i]!;
+
+    if (isControlField(field)) {
+      fields[i] = { tag: field.tag, data: field.data };
+    } else {
+      // Pre-allocate subfield array
+      const subfields = new Array<{ code: string; value: string }>(field.subfields.length);
+      for (let j = 0; j < field.subfields.length; j++) {
+        const sf = field.subfields[j]!;
+        subfields[j] = { code: sf.code, value: sf.value };
+      }
+
+      fields[i] = {
+        tag: field.tag,
+        indicator1: field.indicator1,
+        indicator2: field.indicator2,
+        subfields: subfields,
+      };
+    }
   }
 
-  return {
-    tag: field.tag,
-    indicator1: field.indicator1,
-    indicator2: field.indicator2,
-    subfields: field.subfields.map((sf) => ({ code: sf.code, value: sf.value })),
-  };
+  return { leader: record.leader, fields };
 }
 
 /**
@@ -61,11 +67,7 @@ function cloneField(field: ControlField | DataField): ControlField | DataField {
  * }
  * ```
  */
-export function recordsEqual(
-  a: MarcRecord,
-  b: MarcRecord,
-  ignoreFieldOrder = false
-): boolean {
+export function recordsEqual(a: MarcRecord, b: MarcRecord, ignoreFieldOrder = false): boolean {
   if (a.leader !== b.leader) return false;
   if (a.fields.length !== b.fields.length) return false;
 
@@ -98,10 +100,7 @@ export function recordsEqual(
  * }
  * ```
  */
-export function fieldsEqual(
-  a: ControlField | DataField,
-  b: ControlField | DataField
-): boolean {
+export function fieldsEqual(a: ControlField | DataField, b: ControlField | DataField): boolean {
   if (a.tag !== b.tag) return false;
 
   if (isControlField(a) && isControlField(b)) {

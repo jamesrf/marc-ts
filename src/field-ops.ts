@@ -26,10 +26,7 @@ import type { MarcRecord, ControlField, DataField } from './types';
  * // record is unchanged, updated contains the new field
  * ```
  */
-export function appendField(
-  record: MarcRecord,
-  field: ControlField | DataField
-): MarcRecord {
+export function appendField(record: MarcRecord, field: ControlField | DataField): MarcRecord {
   return {
     ...record,
     fields: [...record.fields, field],
@@ -70,11 +67,9 @@ export function insertFieldBefore(
     return appendField(record, field);
   }
 
-  const newFields = [
-    ...record.fields.slice(0, index),
-    field,
-    ...record.fields.slice(index),
-  ];
+  // Optimized: Use Array.from + splice instead of multiple slice operations
+  const newFields = Array.from(record.fields);
+  newFields.splice(index, 0, field);
 
   return { ...record, fields: newFields };
 }
@@ -107,11 +102,9 @@ export function insertFieldAfter(
     return appendField(record, field);
   }
 
-  const newFields = [
-    ...record.fields.slice(0, index + 1),
-    field,
-    ...record.fields.slice(index + 1),
-  ];
+  // Optimized: Use Array.from + splice instead of multiple slice operations
+  const newFields = Array.from(record.fields);
+  newFields.splice(index + 1, 0, field);
 
   return { ...record, fields: newFields };
 }
@@ -158,11 +151,9 @@ export function insertGroupedField(
     }
   }
 
-  const newFields = [
-    ...record.fields.slice(0, insertIndex),
-    field,
-    ...record.fields.slice(insertIndex),
-  ];
+  // Optimized: Use Array.from + splice instead of multiple slice operations
+  const newFields = Array.from(record.fields);
+  newFields.splice(insertIndex, 0, field);
 
   return { ...record, fields: newFields };
 }
@@ -221,10 +212,7 @@ export function removeFields(record: MarcRecord, tag: string): MarcRecord {
  * }
  * ```
  */
-export function removeField(
-  record: MarcRecord,
-  field: ControlField | DataField
-): MarcRecord {
+export function removeField(record: MarcRecord, field: ControlField | DataField): MarcRecord {
   return {
     ...record,
     fields: record.fields.filter((f) => f !== field),

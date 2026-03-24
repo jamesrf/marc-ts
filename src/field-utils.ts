@@ -20,10 +20,7 @@ import type { MarcRecord, ControlField, DataField } from './types';
  * }
  * ```
  */
-export function getField(
-  record: MarcRecord,
-  tag: string
-): ControlField | DataField | undefined {
+export function getField(record: MarcRecord, tag: string): ControlField | DataField | undefined {
   return record.fields.find((f) => f.tag === tag);
 }
 

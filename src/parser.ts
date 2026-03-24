@@ -24,6 +24,9 @@ const DIRECTORY_ENTRY_LENGTH = 12;
 const TAG_LENGTH = 3;
 const FIELD_LENGTH_SIZE = 4;
 
+// Shared TextDecoder for performance - safe to reuse as UTF-8 decoding is stateless
+const UTF8_DECODER = new TextDecoder('utf-8', { fatal: false });
+
 /**
  * Internal representation of a directory entry.
  */
@@ -160,8 +163,7 @@ export function parseMarcRecordStrict(buffer: Uint8Array): MarcRecord {
  */
 function decodeLeader(buffer: Uint8Array): string {
   const leaderBytes = buffer.slice(0, LEADER_LENGTH);
-  const decoder = new TextDecoder('utf-8', { fatal: false });
-  return decoder.decode(leaderBytes);
+  return UTF8_DECODER.decode(leaderBytes);
 }
 
 /**
@@ -211,7 +213,6 @@ function parseDirectory(
   maxWarnings: number
 ): DirectoryEntry[] {
   const entries: DirectoryEntry[] = [];
-  const decoder = new TextDecoder('utf-8', { fatal: false }); // Directory is ASCII
 
   for (let i = 0; i < directoryBytes.length; i += DIRECTORY_ENTRY_LENGTH) {
     if (warnings.length >= maxWarnings) break;
@@ -222,7 +223,7 @@ function parseDirectory(
     }
 
     const entryBytes = directoryBytes.slice(i, i + DIRECTORY_ENTRY_LENGTH);
-    const entryStr = decoder.decode(entryBytes);
+    const entryStr = UTF8_DECODER.decode(entryBytes);
 
     const tag = entryStr.substring(0, TAG_LENGTH);
     const fieldLengthStr = entryStr.substring(TAG_LENGTH, TAG_LENGTH + FIELD_LENGTH_SIZE);
@@ -262,7 +263,6 @@ function parseFields(
   maxWarnings: number
 ): (ControlField | DataField)[] {
   const fields: (ControlField | DataField)[] = [];
-  const decoder = new TextDecoder('utf-8', { fatal: false });
 
   for (const entry of directoryEntries) {
     if (warnings.length >= maxWarnings) break;
@@ -288,7 +288,7 @@ function parseFields(
     // Control field (00X): no indicators, just data
     if (entry.tag.startsWith('00')) {
       try {
-        const data = decoder.decode(fieldBytes);
+        const data = UTF8_DECODER.decode(fieldBytes);
         fields.push({ tag: entry.tag, data });
       } catch (error) {
         const warning = createWarning(
@@ -323,7 +323,7 @@ function parseFields(
 
       const subfields = parseSubfields(
         subfieldBytes,
-        decoder,
+        UTF8_DECODER,
         entry.tag,
         warnings,
         strict,

@@ -108,13 +108,14 @@ function serializeField(field: ControlField | DataField, encoder: TextEncoder): 
   }
 
   // Data field: indicators + subfields
-  let result = field.indicator1 + field.indicator2;
+  // Use array join for O(n) complexity instead of string concatenation O(n²)
+  const parts: string[] = [field.indicator1, field.indicator2];
 
   for (const subfield of field.subfields) {
-    result += String.fromCharCode(SUBFIELD_DELIMITER) + subfield.code + subfield.value;
+    parts.push(String.fromCharCode(SUBFIELD_DELIMITER), subfield.code, subfield.value);
   }
 
-  return encoder.encode(result);
+  return encoder.encode(parts.join(''));
 }
 
 /**
