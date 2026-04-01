@@ -107,7 +107,7 @@ export interface MarcWarning {
 export interface ParseOptions {
   /**
    * If true, throw errors instead of collecting warnings.
-   * Default: false (matches Perl MARC::Record behavior)
+   * Default: false
    */
   readonly strict?: boolean;
 

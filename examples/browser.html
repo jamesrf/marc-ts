@@ -171,7 +171,7 @@
     <footer>
       <p>
         Powered by <a href="https://github.com/yourusername/marc-ts" target="_blank">marc-ts</a>
-        &bull; A TypeScript MARC21 library with Perl MARC::Record API compatibility
+        &bull; A TypeScript MARC21 library for Node.js and browsers
       </p>
     </footer>
   </div>
@@ -302,7 +302,7 @@
 
           ${result.warnings.length > 0 ? `
             <div class="warning">
-              <div class="warning-title">⚠ Parsing Warnings (${result.warnings.length})</div>
+              <div class="warning-title">Parsing Warnings (${result.warnings.length})</div>
               ${result.warnings.map(w => `<div class="warning-item">• ${escapeHtml(w.message)}</div>`).join('')}
             </div>
           ` : ''}

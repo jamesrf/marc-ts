@@ -1,7 +1,7 @@
 {
   "name": "marc-ts",
   "version": "0.1.0",
-  "description": "TypeScript MARC21 library with Perl MARC::Record API compatibility for Node.js and browsers",
+  "description": "TypeScript MARC21 library for Node.js and browsers",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -16,8 +16,7 @@
   "files": [
     "dist",
     "src",
-    "README.md",
-    "PERL_MIGRATION.md"
+    "README.md"
   ],
   "scripts": {
     "build": "vite build",

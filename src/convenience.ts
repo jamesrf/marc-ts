@@ -1,6 +1,5 @@
 /**
  * Convenience accessor functions for common bibliographic data.
- * Provides Perl MARC::Record-compatible method names.
  */
 
 import type { MarcRecord } from './types';
@@ -9,7 +8,6 @@ import { getField, getSubfield } from './field-utils';
 
 /**
  * Extract the title from a MARC record (245 $a$b).
- * Perl equivalent: $record->title()
  *
  * @param record - The MARC record
  * @returns The title, or undefined if not found
@@ -53,7 +51,6 @@ export function titleProper(record: MarcRecord): string | undefined {
 
 /**
  * Extract the author from a MARC record (100 $a or 110 $a).
- * Perl equivalent: $record->author()
  *
  * @param record - The MARC record
  * @returns The author name, or undefined if not found
@@ -82,7 +79,6 @@ export function author(record: MarcRecord): string | undefined {
 
 /**
  * Extract the edition statement from a MARC record (250 $a).
- * Perl equivalent: $record->edition()
  *
  * @param record - The MARC record
  * @returns The edition statement, or undefined if not found
@@ -102,7 +98,6 @@ export function edition(record: MarcRecord): string | undefined {
 /**
  * Extract the publisher from a MARC record (264 $b or 260 $b).
  * Tries RDA field (264) first, then falls back to AACR2 field (260).
- * Perl equivalent: $record->publisher()
  *
  * @param record - The MARC record
  * @returns The publisher name, or undefined if not found
@@ -133,7 +128,6 @@ export function publisher(record: MarcRecord): string | undefined {
 /**
  * Extract the publication date from a MARC record (264 $c or 260 $c).
  * Tries RDA field (264) first, then falls back to AACR2 field (260).
- * Perl equivalent: $record->publication_date()
  *
  * @param record - The MARC record
  * @returns The publication date, or undefined if not found
@@ -164,7 +158,6 @@ export function publicationDate(record: MarcRecord): string | undefined {
 /**
  * Extract all ISBNs from a MARC record (020 $a).
  * Returns an array because ISBN is a repeatable field.
- * Perl equivalent: $record->isbn()
  *
  * @param record - The MARC record
  * @returns Array of ISBNs (empty if none found)
@@ -190,7 +183,6 @@ export function isbn(record: MarcRecord): string[] {
 
 /**
  * Extract the ISSN from a MARC record (022 $a).
- * Perl equivalent: $record->issn()
  *
  * @param record - The MARC record
  * @returns The ISSN, or undefined if not found
@@ -209,7 +201,6 @@ export function issn(record: MarcRecord): string | undefined {
 
 /**
  * Extract the LCCN from a MARC record (010 $a).
- * Perl equivalent: $record->lccn()
  *
  * @param record - The MARC record
  * @returns The LCCN, or undefined if not found
@@ -229,7 +220,6 @@ export function lccn(record: MarcRecord): string | undefined {
 /**
  * Extract all subject headings from a MARC record (6XX $a).
  * Includes all 6XX fields (600-699).
- * Perl equivalent: similar to iterating over $record->field('6..')
  *
  * @param record - The MARC record
  * @returns Array of subject headings (empty if none found)
@@ -256,7 +246,6 @@ export function subjects(record: MarcRecord): string[] {
 
 /**
  * Extract the series statement from a MARC record (490 $a).
- * Perl equivalent: similar to $record->field('490')->subfield('a')
  *
  * @param record - The MARC record
  * @returns The series statement, or undefined if not found

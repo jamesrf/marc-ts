@@ -1,6 +1,6 @@
 /**
  * Wildcard field querying for MARC records.
- * Supports Perl MARC::Record-style wildcard patterns.
+ * Supports wildcard patterns for flexible field matching.
  */
 
 import type { MarcRecord, ControlField, DataField } from './types';
@@ -44,7 +44,6 @@ function matchesPattern(tag: string, pattern: string): boolean {
 
 /**
  * Get all fields matching a wildcard pattern.
- * Perl equivalent: $record->field('6..')
  *
  * @param record - The MARC record to search
  * @param pattern - The pattern to match (e.g., '6..', '7XX', '24X', 'X00')

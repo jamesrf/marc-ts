@@ -7,8 +7,7 @@ import type { MarcRecord, ControlField, DataField } from './types';
 
 /**
  * Append a field to the end of a record.
- * Perl equivalent: $record->append_fields($field)
- * TypeScript difference: Returns a new record, does not mutate the original.
+ * Returns a new record, does not mutate the original.
  *
  * @param record - The MARC record
  * @param field - The field to append
@@ -35,8 +34,7 @@ export function appendField(record: MarcRecord, field: ControlField | DataField)
 
 /**
  * Insert a field before the first occurrence of a tag.
- * Perl equivalent: $record->insert_fields_before('600', $field)
- * TypeScript difference: Returns a new record, does not mutate the original.
+ * Returns a new record, does not mutate the original.
  *
  * @param record - The MARC record
  * @param tag - The tag to insert before
@@ -76,8 +74,7 @@ export function insertFieldBefore(
 
 /**
  * Insert a field after the first occurrence of a tag.
- * Perl equivalent: $record->insert_fields_after('600', $field)
- * TypeScript difference: Returns a new record, does not mutate the original.
+ * Returns a new record, does not mutate the original.
  *
  * @param record - The MARC record
  * @param tag - The tag to insert after
@@ -175,8 +172,7 @@ function getFieldBlock(tag: string): number {
 
 /**
  * Remove all fields with a specific tag.
- * Perl equivalent: $record->delete_fields('650')
- * TypeScript difference: Returns a new record, does not mutate the original.
+ * Returns a new record, does not mutate the original.
  *
  * @param record - The MARC record
  * @param tag - The tag of fields to remove

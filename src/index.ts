@@ -1,6 +1,5 @@
 /**
- * marc-ts: TypeScript MARC21 library with Perl MARC::Record API compatibility
- * for Node.js and browsers.
+ * marc-ts: TypeScript MARC21 library for Node.js and browsers.
  *
  * @packageDocumentation
  */
@@ -23,7 +22,7 @@ export { isControlField, isDataField } from './types';
 export { parseMarcRecord, parseMarcRecordStrict } from './parser';
 export { serializeMarcRecord } from './serializer';
 
-// Convenience accessors (Perl MARC::Record compatible)
+// Convenience accessors
 export {
   title,
   titleProper,
@@ -41,7 +40,7 @@ export {
 // Field access utilities
 export { getField, getFields, getSubfield, getSubfields, getAllSubfields } from './field-utils';
 
-// Wildcard querying (Perl MARC::Record compatible)
+// Wildcard querying
 export { getFieldsByPattern, getFirstFieldByPattern } from './query';
 
 // Field operations (immutable)

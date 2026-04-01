@@ -1,18 +1,18 @@
 # marc-ts
 
-> TypeScript MARC21 library with Perl MARC::Record API compatibility for Node.js and browsers
+> TypeScript MARC21 library for Node.js and browsers
 
 [![npm version](https://img.shields.io/npm/v/marc-ts.svg)](https://www.npmjs.com/package/marc-ts)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## Features
 
-- 🎯 **Familiar to Perl MARC::Record users** - Same method names and behaviors for easy migration
-- 🔒 **Immutable API** - All operations return new objects, never mutate existing records
-- 📦 **Zero runtime dependencies** - Works in browsers and Node.js (≥14) without any dependencies
-- 🔍 **Type-safe** - Full TypeScript type definitions with strict typing
-- ✅ **Well-tested** - >90% code coverage with comprehensive test suite
-- 🌐 **Universal** - Runs in Node.js and modern browsers (Chrome, Firefox, Safari, Edge)
+- **Immutable API** - All operations return new objects, never mutate existing records
+- **Zero runtime dependencies** - Works in browsers and Node.js (≥14) without any dependencies
+- **Type-safe** - Full TypeScript type definitions with strict typing
+- **Well-tested** - >90% code coverage with comprehensive test suite
+- **Universal** - Runs in Node.js and modern browsers (Chrome, Firefox, Safari, Edge)
+- **Functional design** - Pure functions for composability and predictability
 
 ## Installation
 
@@ -45,44 +45,41 @@ if (result.warnings.length > 0) {
 
 ## Why marc-ts?
 
-Existing JavaScript/TypeScript MARC libraries are either:
+Existing JavaScript/TypeScript MARC libraries are often:
 - Node.js-only (using streams, fs, Buffer APIs)
-- Class-based OOP patterns (not TypeScript-idiomatic)
-- Mutable APIs (following Perl's design)
-- Lacking Perl MARC::Record familiarity (steep learning curve)
+- Class-based OOP patterns that don't leverage TypeScript's strengths
+- Mutable APIs that can lead to unexpected bugs
+- Lacking comprehensive type definitions
 
-**marc-ts** fills this gap by combining:
-- Perl MARC::Record's familiar API
-- TypeScript's type safety and functional patterns
-- Universal browser/Node.js compatibility
-- Immutable operations for safer code
+**marc-ts** addresses these limitations:
+- Universal browser and Node.js compatibility
+- TypeScript-native with full type safety and functional patterns
+- Immutable operations for safer, more predictable code
+- Zero runtime dependencies for minimal bundle size
 
 ## Core Concepts
 
 ### Immutability
 
-Unlike Perl MARC::Record which mutates records in place, **marc-ts** returns new objects:
+All operations in **marc-ts** return new objects rather than modifying existing ones:
 
 ```typescript
-// Perl (mutable):
-// $record->append_fields($field); // Modifies $record
-
-// TypeScript (immutable):
-const updated = appendField(record, field); // record is unchanged
+const updated = appendField(record, field); // record remains unchanged
 ```
 
-This prevents accidental mutations and makes code easier to reason about.
+This approach prevents accidental mutations and makes code easier to reason about, especially in reactive frameworks like React or Vue.
 
 ### Functional API
 
-Instead of methods on objects, **marc-ts** uses pure functions:
+**marc-ts** uses pure functions for maximum composability:
 
 ```typescript
-// Perl: $record->title()
-// TypeScript: title(record)
+// Extract metadata using pure functions
+const bookTitle = title(record);
+const bookAuthor = author(record);
 
-// Perl: $record->field('245')
-// TypeScript: getField(record, '245')
+// Access fields functionally
+const titleField = getField(record, '245');
 ```
 
 ### Type Safety
@@ -344,26 +341,9 @@ Author: ${author(result.record) || 'N/A'}
 </html>
 ```
 
-## Migrating from Perl MARC::Record
-
-See [PERL_MIGRATION.md](./PERL_MIGRATION.md) for a comprehensive migration guide.
-
 ## Examples
 
 See the [examples/](./examples/) directory for more examples:
 - [basic-usage.ts](./examples/basic-usage.ts) - Common usage patterns
 - [browser.html](./examples/browser.html) - Browser integration
 
-## License
-
-MIT © [Your Name]
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## Related Projects
-
-- [Perl MARC::Record](https://metacpan.org/pod/MARC::Record) - Original Perl library
-- [@natlibfi/marc-record](https://github.com/NatLibFi/marc-record-js) - Node.js-only MARC library
-- [marcjs](https://github.com/fredericd/marcjs) - Stream-based Node.js MARC library

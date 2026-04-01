@@ -7,7 +7,6 @@ import { isControlField } from './types';
 
 /**
  * Create a deep clone of a MARC record.
- * Perl equivalent: $record->clone()
  *
  * @param record - The MARC record to clone
  * @returns A new, independent copy of the record

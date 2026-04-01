@@ -108,7 +108,7 @@ function example1_createRecord(): void {
   // Parse it back
   const result = parseMarcRecord(buffer);
   if (result.record) {
-    console.log('✓ Roundtrip successful!');
+    console.log('Roundtrip successful!');
     console.log('  Warnings:', result.warnings.length);
   }
 }
