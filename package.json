@@ -42,16 +42,16 @@
     "browser",
     "nodejs"
   ],
-  "author": "",
+  "author": "James Fournie <james.fournie@gmail.com>",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/marc-ts"
+    "url": "https://github.com/jamesrf/marc-ts"
   },
   "bugs": {
-    "url": "https://github.com/yourusername/marc-ts/issues"
+    "url": "https://github.com/jamesrf/marc-ts/issues"
   },
-  "homepage": "https://github.com/yourusername/marc-ts#readme",
+  "homepage": "https://github.com/jamesrf/marc-ts#readme",
   "engines": {
     "node": ">=14.0.0"
   },
