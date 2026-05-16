@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { getField, getFields, getSubfield, getSubfields, getAllSubfields } from '../field-utils';
-import type { MarcRecord, DataField } from '../types';
+import type { MarcRecord } from '../types';
 import { isDataField } from '../types';
 
 describe('Field Utilities', () => {

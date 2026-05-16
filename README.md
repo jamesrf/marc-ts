@@ -61,7 +61,7 @@ Existing JavaScript/TypeScript MARC libraries are often:
 
 ### Immutability
 
-All operations in **marc-ts** return new objects rather than modifying existing ones:
+Mutation-style operations in **marc-ts** return new records or fields rather than modifying existing ones:
 
 ```typescript
 const updated = appendField(record, field); // record remains unchanged
@@ -107,7 +107,7 @@ Parse ISO2709 binary data into a MARC record.
 
 ```typescript
 const result = parseMarcRecord(buffer, {
-  strict: false, // If true, throw errors instead of collecting warnings
+  strict: false, // If true, throw on fatal parse errors
   maxWarnings: 100, // Maximum warnings to collect
 });
 
@@ -118,9 +118,11 @@ if (result.record) {
 }
 ```
 
+Recoverable issues may still be returned in `warnings`, such as MARC leader compatibility warnings.
+
 #### `parseMarcRecordStrict(buffer): MarcRecord`
 
-Convenience wrapper for strict parsing (throws on errors).
+Convenience wrapper for strict parsing (throws on fatal parse errors).
 
 ```typescript
 try {
@@ -197,6 +199,17 @@ if (field && isDataField(field)) {
 }
 ```
 
+#### `getAllSubfields(field): Array<{ code: string; value: string }>`
+
+Get all subfields from a data field.
+
+```typescript
+const field = getField(record, '245');
+if (field && isDataField(field)) {
+  const allSubfields = getAllSubfields(field);
+}
+```
+
 ### Wildcard Querying
 
 #### `getFieldsByPattern(record, pattern): (ControlField | DataField)[]`
@@ -212,6 +225,14 @@ const addedEntries = getFieldsByPattern(record, '7XX');
 
 // Get all X00 fields (100, 200, ..., 900)
 const x00Fields = getFieldsByPattern(record, 'X00');
+```
+
+#### `getFirstFieldByPattern(record, pattern): ControlField | DataField | undefined`
+
+Get the first field matching a wildcard pattern.
+
+```typescript
+const firstSubject = getFirstFieldByPattern(record, '6..');
 ```
 
 ### Field Operations (Immutable)
@@ -267,6 +288,15 @@ Remove all fields with a specific tag.
 const updated = removeFields(record, '650');
 ```
 
+#### `removeField(record, field): MarcRecord`
+
+Remove a specific field instance using reference equality.
+
+```typescript
+const field = getField(record, '650');
+const updated = field ? removeField(record, field) : record;
+```
+
 #### Subfield Operations
 
 ```typescript
@@ -304,6 +334,26 @@ if (recordsEqual(record1, record2)) {
 if (recordsEqual(record1, record2, true)) {
   console.log('Records have same content');
 }
+```
+
+#### `fieldsEqual(a, b): boolean`
+
+Check if two fields are equal.
+
+```typescript
+if (fieldsEqual(field1, field2)) {
+  console.log('Fields are identical');
+}
+```
+
+### Warnings
+
+#### `createWarning(type, message, position?, tag?): MarcWarning`
+
+Create a parsing warning object.
+
+```typescript
+const warning = createWarning('invalid_field', 'Field is out of bounds', 42, '245');
 ```
 
 ## Browser Usage
@@ -347,3 +397,8 @@ See the [examples/](./examples/) directory for more examples:
 - [basic-usage.ts](./examples/basic-usage.ts) - Common usage patterns
 - [browser.html](./examples/browser.html) - Browser integration
 
+## Development
+
+The published library targets Node.js 14+ and modern browsers. The local build,
+lint, and test toolchain uses current Vite, Vitest, and ESLint releases, so
+development requires a modern Node.js version that satisfies those tools.

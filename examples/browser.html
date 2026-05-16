@@ -223,7 +223,7 @@
             ${result.warnings.length > 0 ? `
               <div style="margin-top: 10px;">
                 <strong>Errors:</strong>
-                ${result.warnings.map(w => `<div>• ${w.message}</div>`).join('')}
+                ${result.warnings.map(w => `<div>• ${escapeHtml(w.message)}</div>`).join('')}
               </div>
             ` : ''}
           `;
