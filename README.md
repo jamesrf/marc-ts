@@ -356,6 +356,109 @@ Create a parsing warning object.
 const warning = createWarning('invalid_field', 'Field is out of bounds', 42, '245');
 ```
 
+## Additional Formats
+
+### MARCXML (`marc-ts/xml`)
+
+Import from the `marc-ts/xml` subpath for MARCXML support (Library of Congress schema).
+
+```typescript
+import {
+  parseMarcXml,
+  parseMarcXmlRecord,
+  serializeMarcXml,
+  serializeMarcXmlRecord,
+} from 'marc-ts/xml';
+```
+
+#### `parseMarcXml(xml): MarcRecord[]`
+
+Parse a MARCXML string containing a `<collection>` or one or more bare `<record>` elements.
+
+```typescript
+const records = parseMarcXml(xmlString);
+// Returns all records found in the document
+```
+
+#### `parseMarcXmlRecord(xml): MarcRecord`
+
+Parse a MARCXML string expected to contain exactly one `<record>`. Throws if none is found.
+
+```typescript
+const record = parseMarcXmlRecord(xmlString);
+```
+
+#### `serializeMarcXml(records): string`
+
+Serialize one or more records into a full MARCXML `<collection>` document (with XML declaration).
+
+```typescript
+const xml = serializeMarcXml([record1, record2]);
+```
+
+#### `serializeMarcXmlRecord(record): string`
+
+Serialize a single record to a `<record>` XML element string (no collection wrapper or XML declaration).
+
+```typescript
+const recordXml = serializeMarcXmlRecord(record);
+```
+
+---
+
+### MARC-in-JSON (`marc-ts/json`)
+
+Import from the `marc-ts/json` subpath for [MARC-in-JSON](https://wiki.code4lib.org/MARCJSONification) support (used by Open Library and many REST APIs).
+
+```typescript
+import {
+  parseMarcJson,
+  serializeMarcJson,
+  serializeMarcJsonString,
+} from 'marc-ts/json';
+import type { MarcJsonObject } from 'marc-ts/json';
+```
+
+The format represents each field as a single-key object in an array:
+
+```json
+{
+  "leader": "01142cam a2200301 a 4500",
+  "fields": [
+    { "001": "5490" },
+    { "245": { "subfields": [{ "a": "The Hobbit" }], "ind1": "1", "ind2": "0" } }
+  ]
+}
+```
+
+#### `parseMarcJson(json): MarcRecord`
+
+Parse a MARC-in-JSON object or JSON string into a `MarcRecord`. Throws on structural errors.
+
+```typescript
+const record = parseMarcJson(jsonString);      // from a JSON string
+const record = parseMarcJson(jsonObject);      // from a plain object
+```
+
+#### `serializeMarcJson(record): MarcJsonObject`
+
+Serialize a `MarcRecord` to a MARC-in-JSON plain object.
+
+```typescript
+const obj = serializeMarcJson(record);
+// obj.leader, obj.fields — ready for JSON.stringify or further processing
+```
+
+#### `serializeMarcJsonString(record): string`
+
+Serialize a `MarcRecord` directly to a JSON string.
+
+```typescript
+const json = serializeMarcJsonString(record);
+```
+
+---
+
 ## Browser Usage
 
 **marc-ts** works in modern browsers without any bundler configuration:
