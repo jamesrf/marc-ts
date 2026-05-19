@@ -5,6 +5,19 @@
 
 import type { MarcRecord, ControlField, DataField } from './types';
 import { isControlField } from './types';
+import { unicodeToMarc8 } from './marc8';
+
+/**
+ * Options for serializing MARC records.
+ */
+export interface SerializeOptions {
+  /**
+   * Character encoding to use for field content.
+   * - 'utf8' (default): UTF-8; sets leader byte 9 to 'a'.
+   * - 'marc8': MARC8 (ANSEL); sets leader byte 9 to ' ' (space).
+   */
+  readonly encoding?: 'utf8' | 'marc8';
+}
 
 // ISO2709 separator characters
 const SUBFIELD_DELIMITER = 0x1f; // ASCII 31 (IS1 - Unit Separator)
@@ -42,8 +55,12 @@ const STARTING_POSITION_SIZE = 5;
  * // Can now be written to file or transmitted
  * ```
  */
-export function serializeMarcRecord(record: MarcRecord): Uint8Array {
+export function serializeMarcRecord(record: MarcRecord, options: SerializeOptions = {}): Uint8Array {
+  const useMarc8 = options.encoding === 'marc8';
   const encoder = new TextEncoder();
+  const encodeText: (s: string) => Uint8Array = useMarc8
+    ? unicodeToMarc8
+    : (s) => encoder.encode(s);
 
   // Build directory and data sections
   const directoryEntries: string[] = [];
@@ -51,7 +68,7 @@ export function serializeMarcRecord(record: MarcRecord): Uint8Array {
   let dataPosition = 0;
 
   for (const field of record.fields) {
-    const fieldData = serializeField(field, encoder);
+    const fieldData = serializeField(field, encodeText);
     const fieldLength = fieldData.length + 1; // +1 for field terminator
 
     // Directory entry: tag (3) + length (4) + position (5) = 12 bytes
@@ -87,7 +104,7 @@ export function serializeMarcRecord(record: MarcRecord): Uint8Array {
 
   // Build leader with calculated values
   const recordLength = baseAddress + totalDataLength + 1; // +1 for record terminator
-  const leader = buildLeader(record.leader, recordLength, baseAddress);
+  const leader = buildLeader(record.leader, recordLength, baseAddress, useMarc8);
 
   // Assemble final record
   const result = new Uint8Array(recordLength);
@@ -102,20 +119,34 @@ export function serializeMarcRecord(record: MarcRecord): Uint8Array {
 /**
  * Serialize a single field (control or data) to bytes.
  */
-function serializeField(field: ControlField | DataField, encoder: TextEncoder): Uint8Array {
+function serializeField(
+  field: ControlField | DataField,
+  encodeText: (s: string) => Uint8Array
+): Uint8Array {
   if (isControlField(field)) {
-    return encoder.encode(field.data);
+    return encodeText(field.data);
   }
 
-  // Data field: indicators + subfields
-  // Use array join for O(n) complexity instead of string concatenation O(n²)
-  const parts: string[] = [field.indicator1, field.indicator2];
+  // Data field: indicators (always ASCII) + subfields
+  const indicatorBytes = new Uint8Array([
+    field.indicator1.charCodeAt(0) || 0x20,
+    field.indicator2.charCodeAt(0) || 0x20,
+  ]);
 
+  const subfieldParts: Uint8Array[] = [indicatorBytes];
   for (const subfield of field.subfields) {
-    parts.push(String.fromCharCode(SUBFIELD_DELIMITER), subfield.code, subfield.value);
+    const delimAndCode = new Uint8Array([SUBFIELD_DELIMITER, subfield.code.charCodeAt(0)!]);
+    subfieldParts.push(delimAndCode, encodeText(subfield.value));
   }
 
-  return encoder.encode(parts.join(''));
+  const totalLen = subfieldParts.reduce((n, b) => n + b.length, 0);
+  const out = new Uint8Array(totalLen);
+  let off = 0;
+  for (const part of subfieldParts) {
+    out.set(part, off);
+    off += part.length;
+  }
+  return out;
 }
 
 /**
@@ -126,7 +157,12 @@ function serializeField(field: ControlField | DataField, encoder: TextEncoder): 
  * @param baseAddress - The calculated base address of data
  * @returns Updated leader (24 characters)
  */
-function buildLeader(originalLeader: string, recordLength: number, baseAddress: number): string {
+function buildLeader(
+  originalLeader: string,
+  recordLength: number,
+  baseAddress: number,
+  useMarc8: boolean
+): string {
   // Ensure original leader is 24 characters
   let leader = originalLeader.padEnd(LEADER_LENGTH, ' ').substring(0, LEADER_LENGTH);
 
@@ -143,6 +179,9 @@ function buildLeader(originalLeader: string, recordLength: number, baseAddress: 
     throw new Error(`Base address ${baseAddress} exceeds maximum (99999)`);
   }
   leader = leader.substring(0, 12) + baseAddressStr + leader.substring(17);
+
+  // Update leader byte 9 (character encoding scheme): ' ' = MARC8, 'a' = UTF-8
+  leader = leader.substring(0, 9) + (useMarc8 ? ' ' : 'a') + leader.substring(10);
 
   return leader;
 }

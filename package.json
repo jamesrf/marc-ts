@@ -11,6 +11,16 @@
       "import": "./dist/index.js",
       "require": "./dist/index.cjs",
       "types": "./dist/index.d.ts"
+    },
+    "./xml": {
+      "import": "./dist/marcxml.js",
+      "require": "./dist/marcxml.cjs",
+      "types": "./dist/marcxml.d.ts"
+    },
+    "./json": {
+      "import": "./dist/marcjson.js",
+      "require": "./dist/marcjson.cjs",
+      "types": "./dist/marcjson.d.ts"
     }
   },
   "files": [

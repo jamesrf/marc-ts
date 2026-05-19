@@ -13,6 +13,7 @@ import type {
   MarcWarning,
   MarcWarningType,
 } from './types';
+import { marc8ToUnicode } from './marc8';
 
 // ISO2709 separator characters
 const SUBFIELD_DELIMITER = 0x1f; // ASCII 31 (IS1 - Unit Separator)
@@ -123,8 +124,14 @@ export function parseMarcRecord(buffer: Uint8Array, options: ParseOptions = {}):
     return { record: null, warnings };
   }
 
+  // Select decoder based on leader byte 9: ' ' = MARC8, 'a' = UTF-8
+  const isMarc8 = leader[9] === ' ';
+  const decodeBytes: (b: Uint8Array) => string = isMarc8
+    ? marc8ToUnicode
+    : (b) => UTF8_DECODER.decode(b);
+
   // Parse fields using directory entries
-  const fields = parseFields(buffer, directoryEntries, baseAddress, warnings, strict, maxWarnings);
+  const fields = parseFields(buffer, directoryEntries, baseAddress, decodeBytes, warnings, strict, maxWarnings);
 
   return {
     record: { leader, fields },
@@ -258,6 +265,7 @@ function parseFields(
   buffer: Uint8Array,
   directoryEntries: DirectoryEntry[],
   baseAddress: number,
+  decodeBytes: (b: Uint8Array) => string,
   warnings: MarcWarning[],
   strict: boolean,
   maxWarnings: number
@@ -288,7 +296,7 @@ function parseFields(
     // Control field (00X): no indicators, just data
     if (entry.tag.startsWith('00')) {
       try {
-        const data = UTF8_DECODER.decode(fieldBytes);
+        const data = decodeBytes(fieldBytes);
         fields.push({ tag: entry.tag, data });
       } catch (error) {
         const warning = createWarning(
@@ -323,7 +331,7 @@ function parseFields(
 
       const subfields = parseSubfields(
         subfieldBytes,
-        UTF8_DECODER,
+        decodeBytes,
         entry.tag,
         warnings,
         strict,
@@ -356,7 +364,7 @@ function parseFields(
  */
 function parseSubfields(
   subfieldBytes: Uint8Array,
-  decoder: TextDecoder,
+  decodeBytes: (b: Uint8Array) => string,
   tag: string,
   warnings: MarcWarning[],
   strict: boolean,
@@ -397,7 +405,7 @@ function parseSubfields(
 
     try {
       const valueBytes = subfieldBytes.slice(valueStart, i);
-      const value = decoder.decode(valueBytes);
+      const value = decodeBytes(valueBytes);
       subfields.push({ code, value });
     } catch (error) {
       const warning = createWarning(

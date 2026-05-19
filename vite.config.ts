@@ -5,13 +5,17 @@ import dts from 'vite-plugin-dts';
 export default defineConfig({
   build: {
     lib: {
-      entry: resolve(__dirname, 'src/index.ts'),
+      entry: {
+        index: resolve(__dirname, 'src/index.ts'),
+        marcxml: resolve(__dirname, 'src/marcxml.ts'),
+        marcjson: resolve(__dirname, 'src/marcjson.ts'),
+      },
       name: 'MarcTS',
       formats: ['es', 'cjs'],
-      fileName: (format) => {
-        if (format === 'es') return 'index.js';
-        if (format === 'cjs') return 'index.cjs';
-        return `index.${format}.js`;
+      fileName: (format, entryName) => {
+        if (format === 'es') return `${entryName}.js`;
+        if (format === 'cjs') return `${entryName}.cjs`;
+        return `${entryName}.${format}.js`;
       },
     },
     sourcemap: true,
