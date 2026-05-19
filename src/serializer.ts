@@ -14,7 +14,9 @@ export interface SerializeOptions {
   /**
    * Character encoding to use for field content.
    * - 'utf8' (default): UTF-8; sets leader byte 9 to 'a'.
-   * - 'marc8': MARC8 (ANSEL); sets leader byte 9 to ' ' (space).
+   * - 'marc8': conservative MARC-8/ANSEL output; sets leader byte 9 to ' ' (space).
+   *   Broad MARC-8 script decoding is supported by the parser, but encoding is limited
+   *   to ASCII plus ANSEL Latin/combining characters.
    */
   readonly encoding?: 'utf8' | 'marc8';
 }
@@ -55,7 +57,10 @@ const STARTING_POSITION_SIZE = 5;
  * // Can now be written to file or transmitted
  * ```
  */
-export function serializeMarcRecord(record: MarcRecord, options: SerializeOptions = {}): Uint8Array {
+export function serializeMarcRecord(
+  record: MarcRecord,
+  options: SerializeOptions = {}
+): Uint8Array {
   const useMarc8 = options.encoding === 'marc8';
   const encoder = new TextEncoder();
   const encodeText: (s: string) => Uint8Array = useMarc8
