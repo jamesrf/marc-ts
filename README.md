@@ -26,6 +26,7 @@ npm install marc-ts
 import { parseMarcRecord, serializeMarcRecord, title, author, isbn, subjects } from 'marc-ts';
 import { parseMarcXml, serializeMarcXml } from 'marc-ts/xml';
 import { parseMarcJson, serializeMarcJsonString } from 'marc-ts/json';
+import { parseMarcTxt, serializeMarcTxt } from 'marc-ts/txt';
 
 // --- ISO 2709 binary (MARC21) ---
 const buffer = new Uint8Array([...]); // Your MARC21 binary data
@@ -70,6 +71,16 @@ const jsonString = JSON.stringify({
 const jsonRecord = parseMarcJson(jsonString);
 console.log('Title from JSON:', title(jsonRecord));
 const roundtripJson = serializeMarcJsonString(jsonRecord); // back to a JSON string
+
+// --- MARCBreaker (marctxt) ---
+const txtString = `=LDR  00000nam a2200000   4500
+=001  5490
+=245  10$aThe Hobbit /$cJ.R.R. Tolkien.
+`;
+
+const [txtRecord] = parseMarcTxt(txtString);
+console.log('Title from marctxt:', title(txtRecord));
+const roundtripTxt = serializeMarcTxt([txtRecord]); // back to marctxt string
 
 // --- MARC-8 binary ---
 // parseMarcRecord detects MARC-8 automatically from leader byte 9 (' ');
@@ -497,6 +508,64 @@ Serialize a `MarcRecord` directly to a JSON string.
 
 ```typescript
 const json = serializeMarcJsonString(record);
+```
+
+---
+
+### MARCBreaker / marctxt (`marc-ts/txt`)
+
+Import from the `marc-ts/txt` subpath for MARCBreaker support. This format (also called MARCMaker or marctxt) is a human-readable line-oriented representation originated by the Library of Congress MARCMaker/MARCBreaker tools and widely used for editing MARC data in plain text.
+
+```typescript
+import {
+  parseMarcTxt,
+  parseMarcTxtRecord,
+  serializeMarcTxt,
+  serializeMarcTxtRecord,
+} from 'marc-ts/txt';
+```
+
+Each field occupies one line. Blank indicators are written as `\`. Subfields use `$` followed by a single-character code. Records are separated by blank lines:
+
+```
+=LDR  00706cam a2200217 a 4500
+=001  5490
+=003  OCoLC
+=245  14$aThe Hobbit /$cJ.R.R. Tolkien.
+=650  \1$aHobbits (Fictitious characters)$vFiction.
+```
+
+#### `parseMarcTxt(text): MarcRecord[]`
+
+Parse a marctxt string containing one or more records separated by blank lines. Accepts both `\n` and `\r\n` line endings.
+
+```typescript
+const records = parseMarcTxt(txtString);
+// Returns all records found
+```
+
+#### `parseMarcTxtRecord(text): MarcRecord`
+
+Parse a marctxt string expected to contain exactly one record. Throws if none is found.
+
+```typescript
+const record = parseMarcTxtRecord(txtString);
+```
+
+#### `serializeMarcTxt(records): string`
+
+Serialize one or more records into a marctxt string, with records separated by blank lines.
+
+```typescript
+const txt = serializeMarcTxt([record1, record2]);
+```
+
+#### `serializeMarcTxtRecord(record): string`
+
+Serialize a single record to marctxt (no surrounding blank line).
+
+```typescript
+const txt = serializeMarcTxtRecord(record);
 ```
 
 ---

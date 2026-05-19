@@ -21,6 +21,11 @@
       "import": "./dist/marcjson.js",
       "require": "./dist/marcjson.cjs",
       "types": "./dist/marcjson.d.ts"
+    },
+    "./txt": {
+      "import": "./dist/marctxt.js",
+      "require": "./dist/marctxt.cjs",
+      "types": "./dist/marctxt.d.ts"
     }
   },
   "files": [

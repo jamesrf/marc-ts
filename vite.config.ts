@@ -9,6 +9,7 @@ export default defineConfig({
         index: resolve(__dirname, 'src/index.ts'),
         marcxml: resolve(__dirname, 'src/marcxml.ts'),
         marcjson: resolve(__dirname, 'src/marcjson.ts'),
+        marctxt: resolve(__dirname, 'src/marctxt.ts'),
       },
       name: 'MarcTS',
       formats: ['es', 'cjs'],
