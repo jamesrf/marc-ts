@@ -63,7 +63,7 @@
   },
   "homepage": "https://github.com/jamesrf/marc-ts#readme",
   "engines": {
-    "node": ">=14.0.0"
+    "node": ">=20.19.0"
   },
   "browser": {
     "buffer": false

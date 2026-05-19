@@ -502,6 +502,6 @@ See the [examples/](./examples/) directory for more examples:
 
 ## Development
 
-The published library targets Node.js 14+ and modern browsers. The local build,
-lint, and test toolchain uses current Vite, Vitest, and ESLint releases, so
-development requires a modern Node.js version that satisfies those tools.
+Requires Node.js **20.19** or **22.12+** (driven by Vite 8). Older Node versions
+are EOL and will fail to install the dev toolchain. The compiled output is
+compatible with modern browsers and any actively-supported Node release.
