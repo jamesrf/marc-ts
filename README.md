@@ -23,24 +23,59 @@ npm install marc-ts
 ## Quick Start
 
 ```typescript
-import { parseMarcRecord, title, author, isbn, subjects } from 'marc-ts';
+import { parseMarcRecord, serializeMarcRecord, title, author, isbn, subjects } from 'marc-ts';
+import { parseMarcXml, serializeMarcXml } from 'marc-ts/xml';
+import { parseMarcJson, serializeMarcJsonString } from 'marc-ts/json';
 
-// Parse MARC21 binary data (ISO2709 format)
+// --- ISO 2709 binary (MARC21) ---
 const buffer = new Uint8Array([...]); // Your MARC21 binary data
 const result = parseMarcRecord(buffer);
 
 if (result.record) {
-  // Extract bibliographic metadata
   console.log('Title:', title(result.record));
   console.log('Author:', author(result.record));
   console.log('ISBNs:', isbn(result.record));
   console.log('Subjects:', subjects(result.record));
 }
-
-// Check for parsing warnings
 if (result.warnings.length > 0) {
   console.warn('Parsing warnings:', result.warnings);
 }
+
+// Serialize back to binary (UTF-8 by default; pass { encoding: 'marc8' } for MARC-8 output)
+const binary = serializeMarcRecord(result.record!, { encoding: 'utf8' });
+
+// --- MARCXML ---
+const xmlString = `<?xml version="1.0"?>
+<collection xmlns="http://www.loc.gov/MARC21/slim">
+  <record>
+    <leader>00000nam a2200000   4500</leader>
+    <datafield tag="245" ind1="1" ind2="0">
+      <subfield code="a">The Hobbit</subfield>
+    </datafield>
+  </record>
+</collection>`;
+
+const [xmlRecord] = parseMarcXml(xmlString);
+console.log('Title from XML:', title(xmlRecord));
+const roundtripXml = serializeMarcXml([xmlRecord]); // back to a <collection> document
+
+// --- MARC-in-JSON ---
+const jsonString = JSON.stringify({
+  leader: '00000nam a2200000   4500',
+  fields: [
+    { '245': { subfields: [{ a: 'The Hobbit' }], ind1: '1', ind2: '0' } },
+  ],
+});
+
+const jsonRecord = parseMarcJson(jsonString);
+console.log('Title from JSON:', title(jsonRecord));
+const roundtripJson = serializeMarcJsonString(jsonRecord); // back to a JSON string
+
+// --- MARC-8 binary ---
+// parseMarcRecord detects MARC-8 automatically from leader byte 9 (' ');
+// records are decoded to Unicode transparently — no special handling needed.
+const marc8Buffer = new Uint8Array([...]); // MARC-8 encoded binary
+const marc8Result = parseMarcRecord(marc8Buffer); // decoded to Unicode automatically
 ```
 
 ## Why marc-ts?
@@ -140,6 +175,13 @@ Serialize a MARC record to ISO2709 binary format.
 const buffer = serializeMarcRecord(record);
 // Can be written to file or transmitted over network
 ```
+
+`parseMarcRecord` decodes UTF-8 records and MARC-8 records signaled by leader
+byte 9. MARC-8 decoding handles escape-designated scripts such as ANSEL Latin,
+Greek, Hebrew, Cyrillic, Arabic, subscript/superscript, and mapped EACC/CJK
+triples. MARC-8 serialization is intentionally conservative: `encoding:
+'marc8'` writes ASCII plus ANSEL Latin/combining characters and replaces
+unsupported Unicode characters with `?`.
 
 ### Convenience Accessors
 

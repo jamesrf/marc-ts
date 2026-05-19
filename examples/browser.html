@@ -54,6 +54,12 @@
       color: #34495e;
     }
 
+    .format-hint {
+      margin-top: 8px;
+      font-size: 12px;
+      color: #7f8c8d;
+    }
+
     input[type="file"] {
       display: block;
       width: 100%;
@@ -73,11 +79,10 @@
       background: #f8f9fa;
       border: 1px solid #dee2e6;
       border-radius: 4px;
-      padding: 20px;
+      padding: 16px 20px;
       font-family: 'Courier New', monospace;
       font-size: 14px;
-      white-space: pre-wrap;
-      word-wrap: break-word;
+      word-break: break-word;
       max-height: 500px;
       overflow-y: auto;
     }
@@ -88,8 +93,9 @@
     }
 
     .field-group {
-      margin-bottom: 15px;
-      padding-bottom: 15px;
+      display: flex;
+      gap: 8px;
+      padding: 5px 0;
       border-bottom: 1px solid #e0e0e0;
     }
 
@@ -100,12 +106,30 @@
     .field-label {
       font-weight: 600;
       color: #2c3e50;
-      margin-bottom: 5px;
+      white-space: nowrap;
+      min-width: 130px;
     }
 
     .field-value {
       color: #34495e;
     }
+
+    .format-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-left: 8px;
+      vertical-align: middle;
+    }
+
+    .format-badge.binary { background: #d5e8d4; color: #2d6a4f; }
+    .format-badge.marc8  { background: #ffe4b5; color: #7c5200; }
+    .format-badge.xml    { background: #dae8fc; color: #1a4e8a; }
+    .format-badge.json   { background: #e1d5e7; color: #4a235a; }
 
     .warning {
       background: #fff3cd;
@@ -157,15 +181,16 @@
 <body>
   <div class="container">
     <h1>marc-ts Browser Example</h1>
-    <p class="subtitle">Parse MARC21 binary files directly in your browser</p>
+    <p class="subtitle">Parse MARC21 records directly in your browser — binary, MARCXML, or MARC-in-JSON</p>
 
     <div class="upload-section">
-      <label for="fileInput">Select a MARC21 file (.mrc):</label>
-      <input type="file" id="fileInput" accept=".mrc,.marc,.dat" />
+      <label for="fileInput">Select a MARC21 file:</label>
+      <input type="file" id="fileInput" accept=".mrc,.marc,.dat,.xml,.json" />
+      <p class="format-hint">Supported formats: ISO 2709 binary (.mrc/.marc/.dat), MARCXML (.xml), MARC-in-JSON (.json)</p>
     </div>
 
     <div id="output" class="output empty">
-      No file selected. Please choose a MARC21 binary file to parse.
+      No file selected. Please choose a MARC21 file to parse.
     </div>
 
     <footer>
@@ -177,8 +202,6 @@
   </div>
 
   <script type="module">
-    // Import marc-ts functions
-    // Note: In production, use a CDN or your bundled version
     import {
       parseMarcRecord,
       title,
@@ -192,8 +215,9 @@
       lccn,
       subjects,
       seriesStatement,
-      getField,
     } from '../dist/index.js';
+    import { parseMarcXml } from '../dist/marcxml.js';
+    import { parseMarcJson } from '../dist/marcjson.js';
 
     const fileInput = document.getElementById('fileInput');
     const output = document.getElementById('output');
@@ -203,110 +227,92 @@
 
       if (!file) {
         output.className = 'output empty';
-        output.textContent = 'No file selected. Please choose a MARC21 binary file to parse.';
+        output.textContent = 'No file selected. Please choose a MARC21 file to parse.';
         return;
       }
 
       try {
-        // Read file as ArrayBuffer
-        const arrayBuffer = await file.arrayBuffer();
-        const buffer = new Uint8Array(arrayBuffer);
+        const ext = file.name.split('.').pop().toLowerCase();
+        let records = [];
+        let formatLabel = '';
+        let warnings = [];
 
-        // Parse MARC record
-        const result = parseMarcRecord(buffer);
+        if (ext === 'xml') {
+          // MARCXML
+          const text = await file.text();
+          records = parseMarcXml(text);
+          formatLabel = 'xml';
+        } else if (ext === 'json') {
+          // MARC-in-JSON
+          const text = await file.text();
+          records = [parseMarcJson(text)];
+          formatLabel = 'json';
+        } else {
+          // ISO 2709 binary (.mrc / .marc / .dat)
+          const arrayBuffer = await file.arrayBuffer();
+          const buffer = new Uint8Array(arrayBuffer);
+          const result = parseMarcRecord(buffer);
+          warnings = result.warnings;
+          if (!result.record) {
+            output.className = 'output error';
+            output.innerHTML = `
+              <strong>Failed to parse MARC record</strong>
+              <p>The file could not be parsed as a valid MARC21 record.</p>
+              ${warnings.length > 0 ? `
+                <div style="margin-top:10px">
+                  <strong>Errors:</strong>
+                  ${warnings.map(w => `<div>• ${escapeHtml(w.message)}</div>`).join('')}
+                </div>
+              ` : ''}
+            `;
+            return;
+          }
+          records = [result.record];
+          // Detect encoding from leader byte 9: ' ' = MARC-8, 'a' = UTF-8
+          formatLabel = result.record.leader[9] === 'a' ? 'binary' : 'marc8';
+        }
 
-        if (!result.record) {
+        if (records.length === 0) {
           output.className = 'output error';
-          output.innerHTML = `
-            <strong>Failed to parse MARC record</strong>
-            <p>The file could not be parsed as a valid MARC21 record.</p>
-            ${result.warnings.length > 0 ? `
-              <div style="margin-top: 10px;">
-                <strong>Errors:</strong>
-                ${result.warnings.map(w => `<div>• ${escapeHtml(w.message)}</div>`).join('')}
-              </div>
-            ` : ''}
-          `;
+          output.innerHTML = '<strong>No records found in file.</strong>';
           return;
         }
 
-        const record = result.record;
+        const record = records[0];
+        const formatBadgeText = {
+          binary: 'ISO 2709 / UTF-8',
+          marc8:  'ISO 2709 / MARC-8',
+          xml:    'MARCXML',
+          json:   'MARC-in-JSON',
+        }[formatLabel];
 
-        // Display parsed metadata
+        const row = (label, value) =>
+          `<div class="field-group"><div class="field-label">${label}</div><div class="field-value">${value}</div></div>`;
+
+        const multiCount = ` <span style="font-size:12px;color:#7f8c8d">(showing record 1 of ${records.length})</span>`;
+
+        const warningsHtml = warnings.length > 0
+          ? `<div class="warning"><div class="warning-title">Parsing Warnings (${warnings.length})</div>${warnings.map(w => `<div class="warning-item">• ${escapeHtml(w.message)}</div>`).join('')}</div>`
+          : '';
+
         output.className = 'output';
-        output.innerHTML = `
-          <div class="field-group">
-            <div class="field-label">Title:</div>
-            <div class="field-value">${escapeHtml(title(record) || 'N/A')}</div>
-          </div>
-
-          <div class="field-group">
-            <div class="field-label">Title Proper:</div>
-            <div class="field-value">${escapeHtml(titleProper(record) || 'N/A')}</div>
-          </div>
-
-          <div class="field-group">
-            <div class="field-label">Author:</div>
-            <div class="field-value">${escapeHtml(author(record) || 'N/A')}</div>
-          </div>
-
-          <div class="field-group">
-            <div class="field-label">Edition:</div>
-            <div class="field-value">${escapeHtml(edition(record) || 'N/A')}</div>
-          </div>
-
-          <div class="field-group">
-            <div class="field-label">Publisher:</div>
-            <div class="field-value">${escapeHtml(publisher(record) || 'N/A')}</div>
-          </div>
-
-          <div class="field-group">
-            <div class="field-label">Publication Date:</div>
-            <div class="field-value">${escapeHtml(publicationDate(record) || 'N/A')}</div>
-          </div>
-
-          <div class="field-group">
-            <div class="field-label">ISBN(s):</div>
-            <div class="field-value">${isbn(record).length > 0 ? escapeHtml(isbn(record).join(', ')) : 'N/A'}</div>
-          </div>
-
-          <div class="field-group">
-            <div class="field-label">ISSN:</div>
-            <div class="field-value">${escapeHtml(issn(record) || 'N/A')}</div>
-          </div>
-
-          <div class="field-group">
-            <div class="field-label">LCCN:</div>
-            <div class="field-value">${escapeHtml(lccn(record) || 'N/A')}</div>
-          </div>
-
-          <div class="field-group">
-            <div class="field-label">Subjects:</div>
-            <div class="field-value">${subjects(record).length > 0 ? escapeHtml(subjects(record).join('; ')) : 'N/A'}</div>
-          </div>
-
-          <div class="field-group">
-            <div class="field-label">Series Statement:</div>
-            <div class="field-value">${escapeHtml(seriesStatement(record) || 'N/A')}</div>
-          </div>
-
-          <div class="field-group">
-            <div class="field-label">Leader:</div>
-            <div class="field-value">${escapeHtml(record.leader)}</div>
-          </div>
-
-          <div class="field-group">
-            <div class="field-label">Total Fields:</div>
-            <div class="field-value">${record.fields.length}</div>
-          </div>
-
-          ${result.warnings.length > 0 ? `
-            <div class="warning">
-              <div class="warning-title">Parsing Warnings (${result.warnings.length})</div>
-              ${result.warnings.map(w => `<div class="warning-item">• ${escapeHtml(w.message)}</div>`).join('')}
-            </div>
-          ` : ''}
-        `;
+        output.innerHTML = [
+          row('Format', `<span class="format-badge ${formatLabel}">${escapeHtml(formatBadgeText)}</span>${multiCount}`),
+          row('Title:', escapeHtml(title(record) || 'N/A')),
+          row('Title Proper:', escapeHtml(titleProper(record) || 'N/A')),
+          row('Author:', escapeHtml(author(record) || 'N/A')),
+          row('Edition:', escapeHtml(edition(record) || 'N/A')),
+          row('Publisher:', escapeHtml(publisher(record) || 'N/A')),
+          row('Publication Date:', escapeHtml(publicationDate(record) || 'N/A')),
+          row('ISBN(s):', isbn(record).length > 0 ? escapeHtml(isbn(record).join(', ')) : 'N/A'),
+          row('ISSN:', escapeHtml(issn(record) || 'N/A')),
+          row('LCCN:', escapeHtml(lccn(record) || 'N/A')),
+          row('Subjects:', subjects(record).length > 0 ? escapeHtml(subjects(record).join('; ')) : 'N/A'),
+          row('Series:', escapeHtml(seriesStatement(record) || 'N/A')),
+          row('Leader:', escapeHtml(record.leader)),
+          row('Total Fields:', record.fields.length),
+          warningsHtml,
+        ].join('');
 
       } catch (error) {
         output.className = 'output error';
@@ -316,8 +322,7 @@
         `;
       }
     });
- 
-    // Utility function to escape HTML
+
     function escapeHtml(text) {
       const div = document.createElement('div');
       div.textContent = text;
