@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { marc8ToUnicode, unicodeToMarc8 } from '../marc8';
+import { marc8ToUnicode, unicodeToMarc8, unicodeToMarc8WithStats } from '../marc8';
 import { parseMarcRecord } from '../parser';
-import { serializeMarcRecord } from '../serializer';
+import { serializeMarcRecord, serializeMarcRecordWithWarnings } from '../serializer';
 import { isDataField } from '../types';
 import type { MarcRecord, ControlField, DataField } from '../types';
 
@@ -331,10 +331,12 @@ describe('unicodeToMarc8', () => {
     expect(Array.from(result)).toEqual([0x3f]);
   });
 
-  it('silently drops unknown combining marks with no MARC-8 equivalent', () => {
+  it('substitutes unknown combining marks with ? (consistent with leading-combining behavior)', () => {
     // U+0338 (combining long solidus) is in the combining range but not in ANSEL
     const result = unicodeToMarc8('a̸');
-    expect(Array.from(result)).toEqual([0x61]); // just 'a', diacritic dropped
+    // After fix: substituted with '?' rather than dropped, so the diacritic
+    // count is preserved (one '?' diacritic precedes the 'a' base).
+    expect(Array.from(result)).toEqual([0x3f, 0x61]);
   });
 
   it('encodes supplementary character (> U+FFFF) as single ?', () => {
@@ -345,6 +347,80 @@ describe('unicodeToMarc8', () => {
 
   it('returns empty bytes for empty string', () => {
     expect(unicodeToMarc8('').length).toBe(0);
+  });
+});
+
+describe('EACC coverage (documented limitation)', () => {
+  it('decodes unmapped EACC triples to U+FFFD', () => {
+    // Pick an EACC triple that is definitely not in the 33-entry table.
+    // 0x21 0x70 0x70 is well past the mapped range (0x21 0x21 0x21..0x42).
+    // Build a MARC-8 stream that switches to EACC then emits one triple.
+    const bytes = new Uint8Array([
+      ESC, 0x24, 0x31, // designate G0 = EACC (multi-byte)
+      0x70, 0x70, 0x70, // unmapped triple
+    ]);
+    const decoded = marc8ToUnicode(bytes);
+    expect(decoded).toContain('�');
+  });
+});
+
+describe('unicodeToMarc8WithStats', () => {
+  it('reports zero lossy substitutions for ASCII input', () => {
+    const { bytes, lossyCount } = unicodeToMarc8WithStats('Hello');
+    expect(lossyCount).toBe(0);
+    expect(bytes.length).toBe(5);
+  });
+
+  it('reports lossy substitutions for unmappable CJK', () => {
+    const { bytes, lossyCount } = unicodeToMarc8WithStats('中');
+    expect(lossyCount).toBe(1);
+    expect(bytes[0]).toBe(0x3f);
+  });
+
+  it('reports lossy substitutions for unknown combining marks', () => {
+    const { bytes, lossyCount } = unicodeToMarc8WithStats('a̸');
+    expect(lossyCount).toBe(1);
+    expect(Array.from(bytes)).toEqual([0x3f, 0x61]);
+  });
+});
+
+describe('serializeMarcRecordWithWarnings', () => {
+  it('emits an encoding_error warning for MARC-8 lossy substitutions', () => {
+    const record: MarcRecord = {
+      leader: '00000nam  2200000   4500',
+      fields: [
+        {
+          tag: '245',
+          indicator1: '1',
+          indicator2: '0',
+          subfields: [{ code: 'a', value: '中文' }],
+        },
+      ],
+    };
+    const { warnings } = serializeMarcRecordWithWarnings(record, { encoding: 'marc8' });
+    expect(warnings).toContainEqual(
+      expect.objectContaining({
+        type: 'encoding_error',
+        tag: '245',
+        message: expect.stringContaining('MARC-8 encoding substituted'),
+      })
+    );
+  });
+
+  it('returns no warnings for a clean UTF-8 record', () => {
+    const record: MarcRecord = {
+      leader: '00000nam a2200000 a 4500',
+      fields: [
+        {
+          tag: '245',
+          indicator1: '1',
+          indicator2: '0',
+          subfields: [{ code: 'a', value: 'Hello' }],
+        },
+      ],
+    };
+    const { warnings } = serializeMarcRecordWithWarnings(record);
+    expect(warnings).toHaveLength(0);
   });
 });
 

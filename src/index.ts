@@ -20,11 +20,12 @@ export { isControlField, isDataField } from './types';
 
 // Parsing and serialization
 export { parseMarcRecord, parseMarcRecordStrict } from './parser';
-export { serializeMarcRecord } from './serializer';
-export type { SerializeOptions } from './serializer';
+export { serializeMarcRecord, serializeMarcRecordWithWarnings } from './serializer';
+export type { SerializeOptions, SerializeResult } from './serializer';
 
 // MARC8 codec (useful for raw byte-level interop)
-export { marc8ToUnicode, unicodeToMarc8 } from './marc8';
+export { marc8ToUnicode, unicodeToMarc8, unicodeToMarc8WithStats } from './marc8';
+export type { Marc8EncodeResult } from './marc8';
 
 // Convenience accessors
 export {

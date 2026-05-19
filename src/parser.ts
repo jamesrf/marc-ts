@@ -29,6 +29,25 @@ const FIELD_LENGTH_SIZE = 4;
 const UTF8_DECODER = new TextDecoder('utf-8', { fatal: false });
 
 /**
+ * Best-effort decoder used when the primary decode raises. Falls back to a
+ * non-fatal UTF-8 decode so callers retain the shape of the record (with
+ * U+FFFD where bytes were invalid) rather than losing the field entirely.
+ */
+function bestEffortDecode(bytes: Uint8Array): string {
+  return UTF8_DECODER.decode(bytes);
+}
+
+/**
+ * Format a byte slice as a short hex preview for warning messages.
+ * Truncates long sequences so warnings stay readable.
+ */
+function bytesPreview(bytes: Uint8Array, max = 16): string {
+  const slice = bytes.slice(0, max);
+  const hex = Array.from(slice, (b) => b.toString(16).padStart(2, '0')).join(' ');
+  return bytes.length > max ? `${hex} … (${bytes.length} bytes)` : hex;
+}
+
+/**
  * Internal representation of a directory entry.
  */
 interface DirectoryEntry {
@@ -90,6 +109,20 @@ export function parseMarcRecord(buffer: Uint8Array, options: ParseOptions = {}):
     if (strict) throw new Error(warning.message);
     warnings.push(warning);
     // Continue with actual buffer length
+  } else if (recordLength < buffer.length) {
+    // Buffer contains trailing bytes beyond the record. Typically a sign that
+    // the caller passed a concatenated stream — they should split on
+    // RECORD_TERMINATOR first. Slice down so subsequent indexing doesn't read
+    // into the next record's data.
+    const warning = createWarning(
+      'truncated_record',
+      `Buffer is longer than the record length declared in the leader: ` +
+        `leader says ${recordLength}, buffer is ${buffer.length} bytes. ` +
+        `Trailing bytes ignored (likely a concatenated stream — split on 0x1D first).`
+    );
+    if (strict) throw new Error(warning.message);
+    warnings.push(warning);
+    buffer = buffer.slice(0, recordLength);
   }
 
   // Extract base address from Leader positions 12-16
@@ -222,7 +255,16 @@ function parseDirectory(
   const entries: DirectoryEntry[] = [];
 
   for (let i = 0; i < directoryBytes.length; i += DIRECTORY_ENTRY_LENGTH) {
-    if (warnings.length >= maxWarnings) break;
+    if (warnings.length >= maxWarnings) {
+      warnings.push(
+        createWarning(
+          'truncated_record',
+          `Directory parsing halted after reaching maxWarnings limit (${maxWarnings}); ` +
+            `remaining ${directoryBytes.length - i} bytes of directory not parsed.`
+        )
+      );
+      break;
+    }
 
     if (i + DIRECTORY_ENTRY_LENGTH > directoryBytes.length) {
       // Partial entry, skip
@@ -273,7 +315,18 @@ function parseFields(
   const fields: (ControlField | DataField)[] = [];
 
   for (const entry of directoryEntries) {
-    if (warnings.length >= maxWarnings) break;
+    if (warnings.length >= maxWarnings) {
+      warnings.push(
+        createWarning(
+          'truncated_record',
+          `Field parsing halted after reaching maxWarnings limit (${maxWarnings}); ` +
+            `not all directory entries were processed.`,
+          undefined,
+          entry.tag
+        )
+      );
+      break;
+    }
 
     const start = baseAddress + entry.startingPosition;
     const end = start + entry.fieldLength - 1; // -1 for field terminator
@@ -291,7 +344,26 @@ function parseFields(
       continue;
     }
 
-    const fieldBytes = buffer.slice(start, end);
+    // Verify the byte at `end` is actually the field terminator. If it isn't,
+    // the directory's fieldLength was off or the record is malformed — emit a
+    // warning and use the full declared span so we don't silently drop the
+    // last real byte of data.
+    let fieldBytes: Uint8Array;
+    if (buffer[end] !== FIELD_TERMINATOR) {
+      const warning = createWarning(
+        'invalid_field',
+        `Field ${entry.tag} does not end with a field terminator at byte ${end} ` +
+          `(found 0x${(buffer[end] ?? 0).toString(16).padStart(2, '0')}); ` +
+          `using the full declared length without stripping a terminator byte.`,
+        start,
+        entry.tag
+      );
+      if (strict) throw new Error(warning.message);
+      warnings.push(warning);
+      fieldBytes = buffer.slice(start, start + entry.fieldLength);
+    } else {
+      fieldBytes = buffer.slice(start, end);
+    }
 
     // Control field (00X): no indicators, just data
     if (entry.tag.startsWith('00')) {
@@ -301,12 +373,17 @@ function parseFields(
       } catch (error) {
         const warning = createWarning(
           'encoding_error',
-          `Failed to decode control field ${entry.tag}: ${error instanceof Error ? error.message : String(error)}`,
+          `Failed to decode control field ${entry.tag}: ` +
+            `${error instanceof Error ? error.message : String(error)}. ` +
+            `Raw bytes (hex): ${bytesPreview(fieldBytes)}.`,
           start,
           entry.tag
         );
         if (strict) throw new Error(warning.message);
         warnings.push(warning);
+        // Preserve the field shape with a best-effort decode so callers retain
+        // the record's structure rather than losing the field entirely.
+        fields.push({ tag: entry.tag, data: bestEffortDecode(fieldBytes) });
       }
       continue;
     }
@@ -374,7 +451,18 @@ function parseSubfields(
   let i = 0;
 
   while (i < subfieldBytes.length) {
-    if (warnings.length >= maxWarnings) break;
+    if (warnings.length >= maxWarnings) {
+      warnings.push(
+        createWarning(
+          'truncated_record',
+          `Subfield parsing halted after reaching maxWarnings limit (${maxWarnings}) ` +
+            `in field ${tag}; not all subfields were processed.`,
+          undefined,
+          tag
+        )
+      );
+      break;
+    }
 
     // Expect SUBFIELD_DELIMITER
     if (subfieldBytes[i] !== SUBFIELD_DELIMITER) {
@@ -403,19 +491,23 @@ function parseSubfields(
       i++;
     }
 
+    const valueBytes = subfieldBytes.slice(valueStart, i);
     try {
-      const valueBytes = subfieldBytes.slice(valueStart, i);
       const value = decodeBytes(valueBytes);
       subfields.push({ code, value });
     } catch (error) {
       const warning = createWarning(
         'encoding_error',
-        `Failed to decode subfield ${tag}$${code}: ${error instanceof Error ? error.message : String(error)}`,
+        `Failed to decode subfield ${tag}$${code}: ` +
+          `${error instanceof Error ? error.message : String(error)}. ` +
+          `Raw bytes (hex): ${bytesPreview(valueBytes)}.`,
         undefined,
         tag
       );
       if (strict) throw new Error(warning.message);
       warnings.push(warning);
+      // Preserve the subfield shape so callers don't lose data structure.
+      subfields.push({ code, value: bestEffortDecode(valueBytes) });
     }
   }
 

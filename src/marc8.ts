@@ -192,8 +192,13 @@ const SUPERSCRIPT: ReadonlyMap<number, string> = new Map([
   [0x6e, 'ⁿ'],
 ]);
 
-// Selected official EACC triples commonly encountered in MARC records. The
-// decoder recognizes EACC as a three-byte set; unmapped triples emit U+FFFD.
+// WARNING: this table maps only 33 of the ~16,000 official EACC triples.
+// Real CJK content in a MARC-8 record will largely decode to U+FFFD. Catalogs
+// with Chinese/Japanese/Korean material should be supplied as UTF-8
+// (`leader[9] === 'a'`) instead. See README.md for guidance.
+//
+// The decoder recognizes EACC as a three-byte set; unmapped triples emit
+// U+FFFD.
 const EACC: ReadonlyMap<number, string> = new Map([
   [0x212121, '一'],
   [0x212122, '丁'],
@@ -445,11 +450,31 @@ export function marc8ToUnicode(bytes: Uint8Array): string {
  *
  * This is intentionally conservative. ASCII and ANSEL Latin/combining
  * characters are encoded. Characters with no supported MARC-8 equivalent are
- * replaced with '?'.
+ * replaced with '?'. For programmatic visibility into how much data was lost,
+ * use {@link unicodeToMarc8WithStats}.
  */
 export function unicodeToMarc8(text: string): Uint8Array {
+  return unicodeToMarc8WithStats(text).bytes;
+}
+
+/**
+ * Result of {@link unicodeToMarc8WithStats}: the encoded bytes plus a count of
+ * characters that had no MARC-8 equivalent and were substituted with '?'.
+ */
+export interface Marc8EncodeResult {
+  readonly bytes: Uint8Array;
+  readonly lossyCount: number;
+}
+
+/**
+ * Like {@link unicodeToMarc8} but also reports how many characters were
+ * substituted because they have no MARC-8 equivalent. A non-zero `lossyCount`
+ * means the round-trip was destructive.
+ */
+export function unicodeToMarc8WithStats(text: string): Marc8EncodeResult {
   const decomposed = text.normalize('NFD');
   const bytes: number[] = [];
+  let lossyCount = 0;
   let i = 0;
 
   while (i < decomposed.length) {
@@ -458,6 +483,7 @@ export function unicodeToMarc8(text: string): Uint8Array {
 
     if (isCombiningMark(ch)) {
       bytes.push(0x3f);
+      lossyCount++;
       i++;
       continue;
     }
@@ -467,7 +493,14 @@ export function unicodeToMarc8(text: string): Uint8Array {
     const diacritics: number[] = [];
     while (j < decomposed.length && isCombiningMark(decomposed[j]!)) {
       const combCode = COMBINING_REVERSE.get(decomposed[j]!);
-      if (combCode !== undefined) diacritics.push(combCode);
+      if (combCode !== undefined) {
+        diacritics.push(combCode);
+      } else {
+        // Unknown combining mark: substitute with '?' rather than dropping
+        // silently, matching the leading-combining-mark behavior above.
+        diacritics.push(0x3f);
+        lossyCount++;
+      }
       j++;
     }
 
@@ -477,11 +510,16 @@ export function unicodeToMarc8(text: string): Uint8Array {
       bytes.push(cp);
     } else {
       const baseByte = NON_COMBINING_REVERSE.get(ch);
-      bytes.push(baseByte ?? 0x3f);
+      if (baseByte !== undefined) {
+        bytes.push(baseByte);
+      } else {
+        bytes.push(0x3f);
+        lossyCount++;
+      }
     }
 
     i = j;
   }
 
-  return new Uint8Array(bytes);
+  return { bytes: new Uint8Array(bytes), lossyCount };
 }

@@ -194,6 +194,18 @@ triples. MARC-8 serialization is intentionally conservative: `encoding:
 'marc8'` writes ASCII plus ANSEL Latin/combining characters and replaces
 unsupported Unicode characters with `?`.
 
+**EACC coverage caveat:** the bundled EACC table maps only ~33 of the ~16,000
+official triples. Records with substantial Chinese/Japanese/Korean content
+will mostly decode to U+FFFD. For CJK catalogs, prefer UTF-8 sources
+(`leader[9] === 'a'`).
+
+**Surfacing lossy MARC-8 encoding:** because `serializeMarcRecord` returns a
+plain `Uint8Array`, lossy substitutions are invisible to callers. Use
+`serializeMarcRecordWithWarnings(record, { encoding: 'marc8' })` to get
+`{ bytes, warnings }` — any character that could not be encoded surfaces as
+an `encoding_error` warning. For just-the-encoder visibility, use
+`unicodeToMarc8WithStats(text)` to get `{ bytes, lossyCount }`.
+
 ### Convenience Accessors
 
 Extract common bibliographic metadata:
@@ -534,6 +546,20 @@ Each field occupies one line. Blank indicators are written as `\`. Subfields use
 =245  14$aThe Hobbit /$cJ.R.R. Tolkien.
 =650  \1$aHobbits (Fictitious characters)$vFiction.
 ```
+
+**Value escape extension (non-standard).** Standard MARCBreaker has no way to
+represent a literal `$` or an embedded newline in a value, so subfield values
+with either character round-trip lossily through other MARCBreaker tools.
+`marc-ts` escapes these on serialize and unescapes them on parse so the
+round-trip is lossless:
+
+- `$` → `{dollar}`
+- `\n` → `{newline}`
+- `{` → `{lbrace}` (so the escape strings themselves round-trip)
+
+Source values that do not contain any of these characters are emitted
+verbatim, matching MARCBreaker conventions. Records written by other tools
+(without the escape extension) are read as-is.
 
 #### `parseMarcTxt(text): MarcRecord[]`
 

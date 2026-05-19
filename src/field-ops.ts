@@ -130,44 +130,31 @@ export function insertGroupedField(
   record: MarcRecord,
   field: ControlField | DataField
 ): MarcRecord {
-  const fieldBlock = getFieldBlock(field.tag);
+  // MARC fields are ordered by numeric tag: LDR → 001 → 010 → 100 → 245 → 999.
+  // Compare tags numerically — a coarse first-digit-block grouping conflates
+  // 010 with 100 and silently misorders inserted control fields.
+  const targetTag = parseInt(field.tag, 10);
 
-  // Find insertion point: after last field in same or earlier block
-  let insertIndex = record.fields.length; // Default: append to end
-
+  // Find insertion point: before the first existing field whose numeric tag
+  // is strictly greater than the new field's.
+  let insertIndex = record.fields.length;
   for (let i = 0; i < record.fields.length; i++) {
     const currentField = record.fields[i];
     if (!currentField) continue;
 
-    const currentBlock = getFieldBlock(currentField.tag);
-
-    // If we've moved past our target block, insert here
-    if (currentBlock > fieldBlock) {
+    const currentTag = parseInt(currentField.tag, 10);
+    // NaN compares false to everything, so non-numeric tags sort to the end —
+    // matching today's behavior for tags like 'XX1'.
+    if (currentTag > targetTag) {
       insertIndex = i;
       break;
     }
   }
 
-  // Optimized: Use Array.from + splice instead of multiple slice operations
   const newFields = Array.from(record.fields);
   newFields.splice(insertIndex, 0, field);
 
   return { ...record, fields: newFields };
-}
-
-/**
- * Get the MARC block number for a tag (used for field ordering).
- * MARC blocks: 00X=0, 01X=1, 0XX=0-9, 1XX=1, 2XX=2, ..., 9XX=9
- */
-function getFieldBlock(tag: string): number {
-  const firstChar = tag.charAt(0);
-  if (firstChar === '0') {
-    // 00X fields are block 0, 01X-09X are blocks 1-9
-    const secondChar = tag.charAt(1);
-    return parseInt(secondChar ?? '0', 10);
-  }
-  // 1XX-9XX: use first digit as block number
-  return parseInt(firstChar ?? '0', 10);
 }
 
 /**

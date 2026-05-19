@@ -199,3 +199,46 @@ describe('serializeMarcXml', () => {
     expect(parsed[0]!.fields).toHaveLength(SAMPLE_RECORD.fields.length);
   });
 });
+
+describe('escapeXml control character handling', () => {
+  it('replaces XML-illegal C0 control characters with U+FFFD', () => {
+    const rec: MarcRecord = {
+      leader: '00000nam a2200000 a 4500',
+      fields: [
+        {
+          tag: '245',
+          indicator1: '1',
+          indicator2: '0',
+          subfields: [{ code: 'a', value: 'before\x07after' }],
+        },
+      ],
+    };
+    const xml = serializeMarcXmlRecord(rec);
+    expect(xml).not.toMatch(/\x07/);
+    expect(xml).toContain('before�after');
+
+    // And the produced XML must remain parseable.
+    const parsed = parseMarcXmlRecord(xml);
+    const df = parsed.fields[0] as { subfields: { code: string; value: string }[] };
+    expect(df.subfields[0]!.value).toBe('before�after');
+  });
+
+  it('preserves a literal carriage return through a round-trip', () => {
+    const rec: MarcRecord = {
+      leader: '00000nam a2200000 a 4500',
+      fields: [
+        {
+          tag: '500',
+          indicator1: ' ',
+          indicator2: ' ',
+          subfields: [{ code: 'a', value: 'line1\rline2' }],
+        },
+      ],
+    };
+    const xml = serializeMarcXmlRecord(rec);
+    expect(xml).toContain('&#13;');
+    const parsed = parseMarcXmlRecord(xml);
+    const df = parsed.fields[0] as { subfields: { code: string; value: string }[] };
+    expect(df.subfields[0]!.value).toBe('line1\rline2');
+  });
+});

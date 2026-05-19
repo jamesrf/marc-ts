@@ -193,6 +193,62 @@ describe('Field Operations', () => {
 
       expect(index500).toBeLessThan(index650);
     });
+
+    it('inserts a 010 field before an existing 100 field', () => {
+      // Previously both 010 and 100 mapped to "block 1" so 010 was appended
+      // after 100 — a misorder consumers would notice on round-trip.
+      const rec: MarcRecord = {
+        leader: '00000nam a2200000 a 4500',
+        fields: [
+          { tag: '001', data: 'x' },
+          {
+            tag: '100',
+            indicator1: '1',
+            indicator2: ' ',
+            subfields: [{ code: 'a', value: 'Author' }],
+          },
+        ],
+      };
+      const newField: DataField = {
+        tag: '010',
+        indicator1: ' ',
+        indicator2: ' ',
+        subfields: [{ code: 'a', value: '   12345 ' }],
+      };
+
+      const result = insertGroupedField(rec, newField);
+      const tags = result.fields.map((f) => f.tag);
+      expect(tags).toEqual(['001', '010', '100']);
+    });
+
+    it('inserts a 650 between 600 and 700', () => {
+      const rec: MarcRecord = {
+        leader: '00000nam a2200000 a 4500',
+        fields: [
+          {
+            tag: '600',
+            indicator1: ' ',
+            indicator2: '0',
+            subfields: [{ code: 'a', value: 'Person' }],
+          },
+          {
+            tag: '700',
+            indicator1: '1',
+            indicator2: ' ',
+            subfields: [{ code: 'a', value: 'Other' }],
+          },
+        ],
+      };
+      const newField: DataField = {
+        tag: '650',
+        indicator1: ' ',
+        indicator2: '0',
+        subfields: [{ code: 'a', value: 'Subject' }],
+      };
+
+      const result = insertGroupedField(rec, newField);
+      expect(result.fields.map((f) => f.tag)).toEqual(['600', '650', '700']);
+    });
   });
 
   describe('removeFields()', () => {

@@ -10,6 +10,14 @@
  *
  * Blank indicators are represented as `\`. Records are separated by blank lines.
  * Subfield delimiter is `$` followed by a single character code.
+ *
+ * Escape extension (non-standard, marc-ts-specific): the standard marctxt format
+ * has no way to represent a literal `$` or an embedded newline in a value. To
+ * make round-trips lossless we escape on serialize and unescape on parse:
+ *   `$`  → `{dollar}`
+ *   `\n` → `{newline}`
+ * Source values that happen to contain the literal escape strings are also
+ * escaped (the `{` is encoded as `{lbrace}`) so the round-trip is unambiguous.
  */
 
 import type { MarcRecord, ControlField, DataField, Subfield } from './types';
@@ -25,6 +33,23 @@ function decodeIndicator(ch: string): string {
   return ch === '\\' ? ' ' : ch;
 }
 
+// ─── Value escape (see file header) ───────────────────────────────────────────
+
+function escapeValue(s: string): string {
+  return s
+    .replace(/\{/g, '{lbrace}')
+    .replace(/\$/g, '{dollar}')
+    .replace(/\n/g, '{newline}');
+}
+
+function unescapeValue(s: string): string {
+  return s.replace(/\{(lbrace|dollar|newline)\}/g, (_, name) => {
+    if (name === 'lbrace') return '{';
+    if (name === 'dollar') return '$';
+    return '\n';
+  });
+}
+
 // ─── Subfield parsing ─────────────────────────────────────────────────────────
 
 /**
@@ -37,7 +62,7 @@ function parseSubfields(str: string): Subfield[] {
   const subfields: Subfield[] = [];
   // parts[0] is content before the first $ — should be empty for well-formed data
   for (let i = 1; i < parts.length; i += 2) {
-    subfields.push({ code: parts[i]!, value: parts[i + 1] ?? '' });
+    subfields.push({ code: parts[i]!, value: unescapeValue(parts[i + 1] ?? '') });
   }
   return subfields;
 }
@@ -65,7 +90,7 @@ function parseRecordLines(lines: string[]): MarcRecord {
 
     if (tag < '010') {
       // Control field: content is the raw field data
-      fields.push({ tag, data: content });
+      fields.push({ tag, data: unescapeValue(content) });
       continue;
     }
 
@@ -131,11 +156,13 @@ export function serializeMarcTxtRecord(record: MarcRecord): string {
 
   for (const field of record.fields) {
     if (isControlField(field)) {
-      lines.push(`=${field.tag}  ${field.data}`);
+      lines.push(`=${field.tag}  ${escapeValue(field.data)}`);
     } else {
       const ind1 = encodeIndicator(field.indicator1);
       const ind2 = encodeIndicator(field.indicator2);
-      const subfields = field.subfields.map((sf) => `$${sf.code}${sf.value}`).join('');
+      const subfields = field.subfields
+        .map((sf) => `$${sf.code}${escapeValue(sf.value)}`)
+        .join('');
       lines.push(`=${field.tag}  ${ind1}${ind2}${subfields}`);
     }
   }

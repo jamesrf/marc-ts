@@ -161,3 +161,67 @@ describe('serializeMarcTxt', () => {
     expect(recordsEqual(SAMPLE_RECORD, parsed[1]!)).toBe(true);
   });
 });
+
+describe('marctxt value escapes', () => {
+  it('round-trips a subfield value containing $', () => {
+    const rec: MarcRecord = {
+      leader: '00000nam a2200000 a 4500',
+      fields: [
+        {
+          tag: '245',
+          indicator1: '1',
+          indicator2: '0',
+          subfields: [{ code: 'a', value: 'Price was $10 in 1985.' }],
+        },
+      ],
+    };
+    const parsed = parseMarcTxtRecord(serializeMarcTxtRecord(rec));
+    expect(parsed.fields).toHaveLength(1);
+    const df = parsed.fields[0] as { subfields: { code: string; value: string }[] };
+    expect(df.subfields).toHaveLength(1);
+    expect(df.subfields[0]).toEqual({ code: 'a', value: 'Price was $10 in 1985.' });
+  });
+
+  it('round-trips a subfield value containing a newline', () => {
+    const rec: MarcRecord = {
+      leader: '00000nam a2200000 a 4500',
+      fields: [
+        {
+          tag: '520',
+          indicator1: ' ',
+          indicator2: ' ',
+          subfields: [{ code: 'a', value: 'Line one\nLine two' }],
+        },
+      ],
+    };
+    const parsed = parseMarcTxtRecord(serializeMarcTxtRecord(rec));
+    const df = parsed.fields[0] as { subfields: { code: string; value: string }[] };
+    expect(df.subfields[0]!.value).toBe('Line one\nLine two');
+  });
+
+  it('round-trips literal escape strings present in source data', () => {
+    const rec: MarcRecord = {
+      leader: '00000nam a2200000 a 4500',
+      fields: [
+        {
+          tag: '500',
+          indicator1: ' ',
+          indicator2: ' ',
+          subfields: [{ code: 'a', value: 'literal {dollar} and {newline} braces' }],
+        },
+      ],
+    };
+    const parsed = parseMarcTxtRecord(serializeMarcTxtRecord(rec));
+    const df = parsed.fields[0] as { subfields: { code: string; value: string }[] };
+    expect(df.subfields[0]!.value).toBe('literal {dollar} and {newline} braces');
+  });
+
+  it('round-trips a control field value containing a newline', () => {
+    const rec: MarcRecord = {
+      leader: '00000nam a2200000 a 4500',
+      fields: [{ tag: '008', data: 'first\nsecond' }],
+    };
+    const parsed = parseMarcTxtRecord(serializeMarcTxtRecord(rec));
+    expect(parsed.fields[0]).toEqual({ tag: '008', data: 'first\nsecond' });
+  });
+});

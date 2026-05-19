@@ -32,10 +32,17 @@ function unescapeXml(text: string): string {
 
 function escapeXml(text: string): string {
   return text
+    // XML 1.0 forbids most C0 control characters in document text. There is no
+    // valid XML 1.0 representation for them, so substitute the Unicode
+    // replacement character to keep the output well-formed.
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '�')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+    .replace(/"/g, '&quot;')
+    // Preserve literal CR through the XML round-trip: XML parsers normalize
+    // bare \r and \r\n to \n, so we must encode CR as a numeric reference.
+    .replace(/\r/g, '&#13;');
 }
 
 // ─── Minimal tokeniser ────────────────────────────────────────────────────────
