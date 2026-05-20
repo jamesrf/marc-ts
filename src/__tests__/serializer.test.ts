@@ -59,5 +59,29 @@ describe('serializeMarcRecord', () => {
       };
       expect(() => serializeMarcRecord(record)).toThrow(/tag must be exactly 3 characters/);
     });
+
+    it('throws when indicator1 is a non-ASCII BMP character (zero-width space)', () => {
+      const record: MarcRecord = {
+        leader: '00000nam  2200000   4500',
+        fields: [{ ...baseDataField, indicator1: '​', subfields: [] }],
+      };
+      expect(() => serializeMarcRecord(record)).toThrow(/indicator1 must be an ASCII printable character/);
+    });
+
+    it('throws when indicator2 is a non-ASCII BMP character (fullwidth digit)', () => {
+      const record: MarcRecord = {
+        leader: '00000nam  2200000   4500',
+        fields: [{ ...baseDataField, indicator2: '１', subfields: [] }],
+      };
+      expect(() => serializeMarcRecord(record)).toThrow(/indicator2 must be an ASCII printable character/);
+    });
+
+    it('throws when a subfield code is a non-ASCII BMP character', () => {
+      const record: MarcRecord = {
+        leader: '00000nam  2200000   4500',
+        fields: [{ ...baseDataField, subfields: [{ code: 'é', value: 'x' }] }],
+      };
+      expect(() => serializeMarcRecord(record)).toThrow(/subfield code must be an ASCII printable character/);
+    });
   });
 });

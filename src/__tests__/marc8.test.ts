@@ -179,22 +179,6 @@ describe('marc8ToUnicode', () => {
     expect(marc8ToUnicode(new Uint8Array([ESC, 0x78, 0x41, 0x42]))).toBe('�AB');
   });
 
-  it('decodes legacy shortcut ESC g (Greek)', () => {
-    expect(marc8ToUnicode(new Uint8Array([ESC, 0x67, 0x61, 0x62]))).toBe('αβ');
-  });
-
-  it('decodes legacy shortcut ESC b (Hebrew)', () => {
-    expect(marc8ToUnicode(new Uint8Array([ESC, 0x62, 0x60, 0x61]))).toBe('אב');
-  });
-
-  it('decodes legacy shortcut ESC p (Cyrillic)', () => {
-    expect(marc8ToUnicode(new Uint8Array([ESC, 0x70, 0x61, 0x62]))).toBe('аб');
-  });
-
-  it('decodes legacy shortcut ESC s (ASCII)', () => {
-    expect(marc8ToUnicode(new Uint8Array([ESC, 0x73, 0x41, 0x42]))).toBe('AB');
-  });
-
   it('decodes multiple combining marks on one base character', () => {
     // MARC8: 0xE5 (macron) + 0xE8 (diaeresis) + 0x61 ('a') → a + macron + diaeresis
     const bytes = new Uint8Array([0xe5, 0xe8, 0x61]);

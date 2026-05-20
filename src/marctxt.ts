@@ -11,13 +11,15 @@
  * Blank indicators are represented as `\`. Records are separated by blank lines.
  * Subfield delimiter is `$` followed by a single character code.
  *
- * Escape extension (non-standard, marc-ts-specific): the standard marctxt format
- * has no way to represent a literal `$` or an embedded newline in a value. To
- * make round-trips lossless we escape on serialize and unescape on parse:
- *   `$`  → `{dollar}`
- *   `\n` → `{newline}`
- * Source values that happen to contain the literal escape strings are also
- * escaped (the `{` is encoded as `{lbrace}`) so the round-trip is unambiguous.
+ * Curly-brace escape sequences (per LC MARCMaker spec):
+ *   `{`  → `{lcub}`   (left curly brace; reserved by the format)
+ *   `}`  → `{rcub}`   (right curly brace; reserved by the format)
+ *   `$`  → `{dollar}` (subfield delimiter)
+ *   `\`  → `{bsol}`   (backslash; reserved as blank-indicator stand-in)
+ *
+ * Extension (non-standard, marc-ts-specific): embedded newlines in values,
+ * which the LC tools don't produce, are escaped as `{newline}` for lossless
+ * round-trips.
  */
 
 import type { MarcRecord, ControlField, DataField, Subfield } from './types';
@@ -36,16 +38,23 @@ function decodeIndicator(ch: string): string {
 // ─── Value escape (see file header) ───────────────────────────────────────────
 
 function escapeValue(s: string): string {
-  return s
-    .replace(/\{/g, '{lbrace}')
-    .replace(/\$/g, '{dollar}')
-    .replace(/\n/g, '{newline}');
+  // Single-pass replacement avoids the problem of earlier escapes being
+  // re-escaped by later passes (e.g. '{' → '{lcub}' then '}' → '{lcub{rcub}').
+  return s.replace(/[{}\\\n$]/g, (ch) => {
+    if (ch === '{') return '{lcub}';
+    if (ch === '}') return '{rcub}';
+    if (ch === '$') return '{dollar}';
+    if (ch === '\\') return '{bsol}';
+    return '{newline}';
+  });
 }
 
 function unescapeValue(s: string): string {
-  return s.replace(/\{(lbrace|dollar|newline)\}/g, (_, name) => {
-    if (name === 'lbrace') return '{';
+  return s.replace(/\{(lcub|rcub|dollar|bsol|newline)\}/g, (_, name) => {
+    if (name === 'lcub') return '{';
+    if (name === 'rcub') return '}';
     if (name === 'dollar') return '$';
+    if (name === 'bsol') return '\\';
     return '\n';
   });
 }
@@ -83,7 +92,7 @@ function parseRecordLines(lines: string[]): MarcRecord {
     // positions 4-5 are the two separator spaces; content starts at 6
     const content = line.slice(6);
 
-    if (tag === 'LDR') {
+    if (tag === 'LDR' || tag === '000') {
       leader = content;
       continue;
     }

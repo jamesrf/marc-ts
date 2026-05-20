@@ -162,10 +162,16 @@ export function serializeMarcRecordWithWarnings(
   return { bytes, warnings };
 }
 
+function isAsciiPrintable(s: string): boolean {
+  const c = s.charCodeAt(0);
+  return c >= 0x20 && c <= 0x7e;
+}
+
 /**
  * Validate a record at the serializer boundary. Throws on any input that would
  * produce silently-corrupted bytes (e.g. an empty subfield code that would
- * serialize to a 0x00 byte and round-trip back as a space).
+ * serialize to a 0x00 byte and round-trip back as a space, or a non-ASCII
+ * character whose code point > 0xFF would be truncated when stored in a Uint8Array).
  */
 function validateRecord(record: MarcRecord): void {
   for (const field of record.fields) {
@@ -184,15 +190,30 @@ function validateRecord(record: MarcRecord): void {
         `Field ${field.tag} indicator1 must be exactly 1 character; got ${JSON.stringify(field.indicator1)}`
       );
     }
+    if (!isAsciiPrintable(field.indicator1)) {
+      throw new Error(
+        `Field ${field.tag} indicator1 must be an ASCII printable character (U+0020–U+007E); got ${JSON.stringify(field.indicator1)}`
+      );
+    }
     if (field.indicator2.length !== 1) {
       throw new Error(
         `Field ${field.tag} indicator2 must be exactly 1 character; got ${JSON.stringify(field.indicator2)}`
+      );
+    }
+    if (!isAsciiPrintable(field.indicator2)) {
+      throw new Error(
+        `Field ${field.tag} indicator2 must be an ASCII printable character (U+0020–U+007E); got ${JSON.stringify(field.indicator2)}`
       );
     }
     for (const sf of field.subfields) {
       if (sf.code.length !== 1) {
         throw new Error(
           `Field ${field.tag} subfield code must be exactly 1 character; got ${JSON.stringify(sf.code)}`
+        );
+      }
+      if (!isAsciiPrintable(sf.code)) {
+        throw new Error(
+          `Field ${field.tag} subfield code must be an ASCII printable character (U+0020–U+007E); got ${JSON.stringify(sf.code)}`
         );
       }
     }

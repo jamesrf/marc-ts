@@ -1,7 +1,8 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { parseMarcRecord, parseMarcRecordStrict } from '../parser';
 import { serializeMarcRecord } from '../serializer';
 import type { MarcRecord, DataField } from '../types';
+import * as marc8Module from '../marc8';
 
 describe('parseMarcRecord', () => {
   function encodeAscii(text: string): Uint8Array {
@@ -558,5 +559,304 @@ describe('parseMarcRecord', () => {
         message: expect.stringContaining('does not end with a field terminator'),
       })
     );
+  });
+
+  it('should throw in strict mode when field does not end with a field terminator', () => {
+    const leader = '00042nam  2200037   4500';
+    const buffer = buildMalformedRecord(leader, '001000400000', encodeAscii('abcd'));
+
+    expect(() => parseMarcRecord(buffer, { strict: true })).toThrow(
+      'does not end with a field terminator'
+    );
+  });
+
+  it('parseMarcRecordStrict returns the record on success', () => {
+    const buffer = serializeMarcRecord({
+      leader: '00000nam  2200000   4500',
+      fields: [{ tag: '001', data: 'test' }],
+    });
+
+    const record = parseMarcRecordStrict(buffer);
+
+    expect(record).toBeDefined();
+    expect(record.fields).toEqual([{ tag: '001', data: 'test' }]);
+  });
+
+  it('should return null and warn in non-strict mode when the directory terminator is missing', () => {
+    // Buffer is long enough but has no 0x1e byte after the leader.
+    const buffer = new Uint8Array(30).fill(0x41); // 'A' throughout — no 0x1e
+    buffer.set(encodeAscii('00030nam  2200029   4500'), 0);
+
+    const result = parseMarcRecord(buffer, { strict: false });
+
+    expect(result.record).toBeNull();
+    expect(result.warnings).toContainEqual(
+      expect.objectContaining({
+        type: 'invalid_directory',
+        message: 'Directory terminator not found',
+      })
+    );
+  });
+
+  it('should return null and warn in non-strict mode when directory has no valid entries', () => {
+    const leader = '00038nam  2200037   4500';
+    const buffer = buildMalformedRecord(leader, '001bad!00000');
+
+    const result = parseMarcRecord(buffer, { strict: false });
+
+    expect(result.record).toBeNull();
+    expect(result.warnings).toContainEqual(
+      expect.objectContaining({
+        type: 'invalid_directory',
+        message: 'No directory entries found',
+      })
+    );
+  });
+
+  it('should throw in strict mode when buffer is longer than declared record length', () => {
+    const valid = serializeMarcRecord({
+      leader: '00000nam  2200000   4500',
+      fields: [{ tag: '001', data: 'ok' }],
+    });
+    const padded = new Uint8Array(valid.length + 10);
+    padded.set(valid);
+
+    expect(() => parseMarcRecord(padded, { strict: true })).toThrow(
+      'Buffer is longer than the record length declared in the leader'
+    );
+  });
+
+  it('should warn when leader encoding flag (byte 9) is neither space nor "a"', () => {
+    const buffer = serializeMarcRecord({
+      leader: '00000nam  2200000   4500',
+      fields: [{ tag: '001', data: 'test' }],
+    });
+    // Byte 9: 'a' means UTF-8, ' ' means MARC-8; anything else is invalid
+    buffer[9] = 'z'.charCodeAt(0);
+
+    const result = parseMarcRecord(buffer, { strict: false });
+
+    expect(result.record).toBeDefined();
+    expect(result.warnings).toContainEqual(
+      expect.objectContaining({
+        type: 'invalid_leader',
+        message: expect.stringContaining("Leader position 9 (encoding flag) is 'z'"),
+      })
+    );
+  });
+
+  it('should throw in strict mode when leader encoding flag (byte 9) is invalid', () => {
+    const buffer = serializeMarcRecord({
+      leader: '00000nam  2200000   4500',
+      fields: [{ tag: '001', data: 'test' }],
+    });
+    buffer[9] = 'z'.charCodeAt(0);
+
+    expect(() => parseMarcRecord(buffer, { strict: true })).toThrow(
+      "Leader position 9 (encoding flag) is 'z'"
+    );
+  });
+
+  it('parseMarcRecordStrict throws when parsing fails', () => {
+    const buffer = new Uint8Array(10); // too short
+
+    expect(() => parseMarcRecordStrict(buffer)).toThrow();
+  });
+
+  it('should warn when data field is too short for indicators in non-strict mode and skip the field', () => {
+    // Field length 2 = 1 byte of data + 0x1e. That leaves 1 byte after stripping
+    // the terminator, which is < 2 (too short for indicators).
+    const leader = '00040nam  2200037   4500';
+    const buffer = buildMalformedRecord(leader, '245000200000', encodeAscii('x'), {
+      appendFieldTerminator: true,
+    });
+
+    const result = parseMarcRecord(buffer, { strict: false });
+
+    expect(result.record?.fields).toEqual([]);
+    expect(result.warnings).toContainEqual(
+      expect.objectContaining({
+        type: 'invalid_field',
+        tag: '245',
+        message: expect.stringContaining('too short for indicators'),
+      })
+    );
+  });
+
+  it('bytesPreview truncates long byte sequences in warning messages', () => {
+    const longValue = 'A'.repeat(24);
+    const record = serializeMarcRecord({
+      leader: '00000nam  2200000   4500',
+      fields: [{ tag: '001', data: longValue }],
+    });
+
+    const result = parseMarcRecord(record);
+
+    expect(result.warnings.filter((w) => w.type === 'encoding_error')).toHaveLength(0);
+    expect((result.record!.fields[0] as { data: string }).data).toBe(longValue);
+  });
+
+  describe('encoding error recovery (mocked decoder)', () => {
+    let spy: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      spy = vi.spyOn(marc8Module, 'marc8ToUnicode').mockImplementation(() => {
+        throw new Error('mock decode failure');
+      });
+    });
+
+    afterEach(() => {
+      spy.mockRestore();
+    });
+
+    // To reach the MARC-8 decoder path, leader byte 9 must be ' ' (space).
+    // serializeMarcRecord writes 'a' at position 9 for UTF-8; patch it to ' '.
+    function makeMarc8Buffer(record: MarcRecord): Uint8Array {
+      const buf = serializeMarcRecord(record);
+      buf[9] = 0x20; // ' ' => MARC-8 path
+      return buf;
+    }
+
+    it('warns and recovers when control field decoding throws (non-strict)', () => {
+      const buf = makeMarc8Buffer({
+        leader: '00000nam  2200000   4500',
+        fields: [{ tag: '001', data: 'test' }],
+      });
+
+      const result = parseMarcRecord(buf, { strict: false });
+
+      expect(result.warnings).toContainEqual(
+        expect.objectContaining({
+          type: 'encoding_error',
+          tag: '001',
+          message: expect.stringContaining('Failed to decode control field 001'),
+        })
+      );
+      // Field is still present with best-effort decode output
+      expect(result.record?.fields.some((f) => f.tag === '001')).toBe(true);
+    });
+
+    it('throws in strict mode when control field decoding throws', () => {
+      const buf = makeMarc8Buffer({
+        leader: '00000nam  2200000   4500',
+        fields: [{ tag: '001', data: 'test' }],
+      });
+
+      expect(() => parseMarcRecord(buf, { strict: true })).toThrow(
+        'Failed to decode control field 001'
+      );
+    });
+
+    it('warns and recovers when subfield decoding throws (non-strict)', () => {
+      const buf = makeMarc8Buffer({
+        leader: '00000nam  2200000   4500',
+        fields: [
+          {
+            tag: '245',
+            indicator1: '1',
+            indicator2: '0',
+            subfields: [{ code: 'a', value: 'Title' }],
+          },
+        ],
+      });
+
+      const result = parseMarcRecord(buf, { strict: false });
+
+      expect(result.warnings).toContainEqual(
+        expect.objectContaining({
+          type: 'encoding_error',
+          tag: '245',
+          message: expect.stringContaining('Failed to decode subfield 245$a'),
+        })
+      );
+    });
+
+    it('throws in strict mode when subfield decoding throws', () => {
+      const buf = makeMarc8Buffer({
+        leader: '00000nam  2200000   4500',
+        fields: [
+          {
+            tag: '245',
+            indicator1: '1',
+            indicator2: '0',
+            subfields: [{ code: 'a', value: 'Title' }],
+          },
+        ],
+      });
+
+      expect(() => parseMarcRecord(buf, { strict: true })).toThrow(
+        'Failed to decode subfield 245$a'
+      );
+    });
+
+    it('includes truncated hex preview in encoding_error warning for long values', () => {
+      // 24-byte value exceeds the 16-byte bytesPreview limit, producing "… (24 bytes)" suffix
+      const longValue = 'A'.repeat(24);
+      const buf = makeMarc8Buffer({
+        leader: '00000nam  2200000   4500',
+        fields: [{ tag: '001', data: longValue }],
+      });
+
+      const result = parseMarcRecord(buf, { strict: false });
+
+      const encErr = result.warnings.find((w) => w.type === 'encoding_error');
+      expect(encErr?.message).toMatch(/… \(24 bytes\)/); // "… (24 bytes)"
+    });
+  });
+});
+
+describe('leader[9] encoding flag validation', () => {
+  it('emits an invalid_leader warning when leader byte 9 is neither space nor "a"', () => {
+    const buffer = serializeMarcRecord({
+      leader: '00000nam a2200000   4500',
+      fields: [{ tag: '001', data: 'test' }],
+    });
+    buffer[9] = 'x'.charCodeAt(0);
+
+    const result = parseMarcRecord(buffer);
+
+    expect(result.record).toBeDefined();
+    expect(result.warnings).toContainEqual(
+      expect.objectContaining({
+        type: 'invalid_leader',
+        message: expect.stringContaining("Leader position 9 (encoding flag) is 'x'"),
+      })
+    );
+  });
+
+  it('throws in strict mode when leader byte 9 is unexpected', () => {
+    const buffer = serializeMarcRecord({
+      leader: '00000nam a2200000   4500',
+      fields: [{ tag: '001', data: 'test' }],
+    });
+    buffer[9] = 'x'.charCodeAt(0);
+
+    expect(() => parseMarcRecord(buffer, { strict: true })).toThrow(
+      /Leader position 9 \(encoding flag\) is 'x'/
+    );
+  });
+
+  it('does not emit an invalid_leader warning for space (MARC-8)', () => {
+    const buffer = serializeMarcRecord({
+      leader: '00000nam  2200000   4500',
+      fields: [{ tag: '001', data: 'test' }],
+    });
+    const result = parseMarcRecord(buffer);
+    const leaderWarnings = result.warnings.filter(
+      (w) => w.type === 'invalid_leader' && w.message.includes('encoding flag')
+    );
+    expect(leaderWarnings).toHaveLength(0);
+  });
+
+  it('does not emit an invalid_leader warning for "a" (UTF-8)', () => {
+    const buffer = serializeMarcRecord({
+      leader: '00000nam a2200000   4500',
+      fields: [{ tag: '001', data: 'test' }],
+    });
+    const result = parseMarcRecord(buffer);
+    const leaderWarnings = result.warnings.filter(
+      (w) => w.type === 'invalid_leader' && w.message.includes('encoding flag')
+    );
+    expect(leaderWarnings).toHaveLength(0);
   });
 });

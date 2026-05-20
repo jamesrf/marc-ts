@@ -301,12 +301,6 @@ function designate(
 
   const first = bytes[pos + 1]!;
 
-  // Alternate single-byte G0 defaults used in older MARC records.
-  if (first === 0x67) return { char: '', next: updateState(state, 'g0', 'greek', pos + 2) };
-  if (first === 0x62) return { char: '', next: updateState(state, 'g0', 'hebrew', pos + 2) };
-  if (first === 0x70) return { char: '', next: updateState(state, 'g0', 'cyrillic', pos + 2) };
-  if (first === 0x73) return { char: '', next: updateState(state, 'g0', 'ascii', pos + 2) };
-
   let target: keyof DecodeState | undefined;
   let finalIndex: number;
 

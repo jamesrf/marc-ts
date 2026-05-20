@@ -159,6 +159,14 @@ export function parseMarcRecord(buffer: Uint8Array, options: ParseOptions = {}):
 
   // Select decoder based on leader byte 9: ' ' = MARC8, 'a' = UTF-8
   const isMarc8 = leader[9] === ' ';
+  if (leader[9] !== ' ' && leader[9] !== 'a') {
+    const warning = createWarning(
+      'invalid_leader',
+      `Leader position 9 (encoding flag) is '${leader[9]}'; expected 'a' (UTF-8) or ' ' (MARC-8). Defaulting to UTF-8.`
+    );
+    if (strict) throw new Error(warning.message);
+    warnings.push(warning);
+  }
   const decodeBytes: (b: Uint8Array) => string = isMarc8
     ? marc8ToUnicode
     : (b) => UTF8_DECODER.decode(b);

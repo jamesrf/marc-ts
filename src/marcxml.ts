@@ -24,8 +24,14 @@ const ENTITY_MAP: ReadonlyMap<string, string> = new Map([
 
 function unescapeXml(text: string): string {
   return text.replace(/&(?:#x([0-9a-fA-F]+)|#([0-9]+)|([a-zA-Z]+));/g, (_, hex, dec, name) => {
-    if (hex) return String.fromCodePoint(parseInt(hex, 16));
-    if (dec) return String.fromCodePoint(parseInt(dec, 10));
+    if (hex !== undefined) {
+      const cp = parseInt(hex, 16);
+      return cp >= 0 && cp <= 0x10ffff ? String.fromCodePoint(cp) : '�';
+    }
+    if (dec !== undefined) {
+      const cp = parseInt(dec, 10);
+      return cp >= 0 && cp <= 0x10ffff ? String.fromCodePoint(cp) : '�';
+    }
     return ENTITY_MAP.get(name) ?? _;
   });
 }

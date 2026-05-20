@@ -98,6 +98,20 @@ describe('parseMarcTxt', () => {
   });
 });
 
+describe('=000 leader (LC spec form)', () => {
+  it('parses =000 as the leader, not as a control field', () => {
+    const txt = [
+      '=000  00000nam a2200000 a 4500',
+      '=001  12345',
+      '',
+    ].join('\n');
+    const [rec] = parseMarcTxt(txt);
+    expect(rec!.leader).toBe('00000nam a2200000 a 4500');
+    expect(rec!.fields).toHaveLength(1);
+    expect(rec!.fields[0]).toMatchObject({ tag: '001', data: '12345' });
+  });
+});
+
 describe('parseMarcTxtRecord', () => {
   it('returns the first record', () => {
     const rec = parseMarcTxtRecord(SAMPLE_TXT);
@@ -207,13 +221,59 @@ describe('marctxt value escapes', () => {
           tag: '500',
           indicator1: ' ',
           indicator2: ' ',
-          subfields: [{ code: 'a', value: 'literal {dollar} and {newline} braces' }],
+          subfields: [{ code: 'a', value: 'literal {dollar} and {newline} and {lcub}rcub} braces' }],
         },
       ],
     };
     const parsed = parseMarcTxtRecord(serializeMarcTxtRecord(rec));
     const df = parsed.fields[0] as { subfields: { code: string; value: string }[] };
-    expect(df.subfields[0]!.value).toBe('literal {dollar} and {newline} braces');
+    expect(df.subfields[0]!.value).toBe('literal {dollar} and {newline} and {lcub}rcub} braces');
+  });
+
+  it('round-trips a subfield value containing a backslash', () => {
+    const rec: MarcRecord = {
+      leader: '00000nam a2200000 a 4500',
+      fields: [
+        {
+          tag: '500',
+          indicator1: ' ',
+          indicator2: ' ',
+          subfields: [{ code: 'a', value: 'C:\\Users\\marc' }],
+        },
+      ],
+    };
+    const txt = serializeMarcTxtRecord(rec);
+    expect(txt).toContain('{bsol}');
+    const parsed = parseMarcTxtRecord(txt);
+    const df = parsed.fields[0] as { subfields: { code: string; value: string }[] };
+    expect(df.subfields[0]!.value).toBe('C:\\Users\\marc');
+  });
+
+  it('round-trips a subfield value containing curly braces', () => {
+    const rec: MarcRecord = {
+      leader: '00000nam a2200000 a 4500',
+      fields: [
+        {
+          tag: '500',
+          indicator1: ' ',
+          indicator2: ' ',
+          subfields: [{ code: 'a', value: 'set {a, b, c}' }],
+        },
+      ],
+    };
+    const txt = serializeMarcTxtRecord(rec);
+    expect(txt).toContain('{lcub}');
+    expect(txt).toContain('{rcub}');
+    const parsed = parseMarcTxtRecord(txt);
+    const df = parsed.fields[0] as { subfields: { code: string; value: string }[] };
+    expect(df.subfields[0]!.value).toBe('set {a, b, c}');
+  });
+
+  it('decodes {bsol} from spec-compliant input', () => {
+    const txt = '=LDR  00000nam a2200000 a 4500\n=500  \\\\$apath is C:{bsol}Users\n';
+    const parsed = parseMarcTxtRecord(txt);
+    const df = parsed.fields[0] as { subfields: { code: string; value: string }[] };
+    expect(df.subfields[0]!.value).toBe('path is C:\\Users');
   });
 
   it('round-trips a control field value containing a newline', () => {

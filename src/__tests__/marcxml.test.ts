@@ -242,3 +242,37 @@ describe('escapeXml control character handling', () => {
     expect(df.subfields[0]!.value).toBe('line1\rline2');
   });
 });
+
+describe('unescapeXml numeric entity handling', () => {
+  it('handles a valid high-plane numeric hex entity without throwing', () => {
+    const xml =
+      '<collection><record>' +
+      '<leader>00000nam a2200000 a 4500</leader>' +
+      '<controlfield tag="001">&#x1F600;</controlfield>' +
+      '</record></collection>';
+    const records = parseMarcXml(xml);
+    expect(records[0]!.fields[0]).toMatchObject({ tag: '001', data: '😀' });
+  });
+
+  it('replaces an out-of-range hex entity with U+FFFD instead of throwing', () => {
+    const xml =
+      '<collection><record>' +
+      '<leader>00000nam a2200000 a 4500</leader>' +
+      '<controlfield tag="001">&#xFFFFFFFF;</controlfield>' +
+      '</record></collection>';
+    expect(() => parseMarcXml(xml)).not.toThrow();
+    const records = parseMarcXml(xml);
+    expect(records[0]!.fields[0]).toMatchObject({ tag: '001', data: '�' });
+  });
+
+  it('replaces an out-of-range decimal entity with U+FFFD instead of throwing', () => {
+    const xml =
+      '<collection><record>' +
+      '<leader>00000nam a2200000 a 4500</leader>' +
+      '<controlfield tag="001">&#2147483648;</controlfield>' +
+      '</record></collection>';
+    expect(() => parseMarcXml(xml)).not.toThrow();
+    const records = parseMarcXml(xml);
+    expect(records[0]!.fields[0]).toMatchObject({ tag: '001', data: '�' });
+  });
+});
