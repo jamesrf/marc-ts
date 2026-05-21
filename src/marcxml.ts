@@ -169,6 +169,12 @@ function parseRecordTokens(tokens: Token[], start: number): { record: MarcRecord
       continue;
     }
 
+    if (tok.type === 'self-close' && tok.name === 'controlfield') {
+      fields.push({ tag: tok.attrs?.['tag'] ?? '', data: '' });
+      i++;
+      continue;
+    }
+
     if (tok.type === 'open' && tok.name === 'controlfield') {
       const tag = tok.attrs?.['tag'] ?? '';
       i++;
@@ -180,6 +186,17 @@ function parseRecordTokens(tokens: Token[], start: number): { record: MarcRecord
       // consume </controlfield>
       if (i < tokens.length && tokens[i]!.type === 'close') i++;
       fields.push({ tag, data });
+      continue;
+    }
+
+    if (tok.type === 'self-close' && tok.name === 'datafield') {
+      fields.push({
+        tag: tok.attrs?.['tag'] ?? '',
+        indicator1: tok.attrs?.['ind1'] ?? ' ',
+        indicator2: tok.attrs?.['ind2'] ?? ' ',
+        subfields: [],
+      });
+      i++;
       continue;
     }
 
