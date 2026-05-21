@@ -191,12 +191,12 @@ describe('marctxt value escapes', () => {
     };
     const parsed = parseMarcTxtRecord(serializeMarcTxtRecord(rec));
     expect(parsed.fields).toHaveLength(1);
-    const df = parsed.fields[0] as { subfields: { code: string; value: string }[] };
+    const df = parsed.fields[0] as unknown as { subfields: { code: string; value: string }[] };
     expect(df.subfields).toHaveLength(1);
     expect(df.subfields[0]).toEqual({ code: 'a', value: 'Price was $10 in 1985.' });
   });
 
-  it('round-trips a subfield value containing a newline', () => {
+  it('replaces embedded newlines with a space on serialize', () => {
     const rec: MarcRecord = {
       leader: '00000nam a2200000 a 4500',
       fields: [
@@ -209,8 +209,8 @@ describe('marctxt value escapes', () => {
       ],
     };
     const parsed = parseMarcTxtRecord(serializeMarcTxtRecord(rec));
-    const df = parsed.fields[0] as { subfields: { code: string; value: string }[] };
-    expect(df.subfields[0]!.value).toBe('Line one\nLine two');
+    const df = parsed.fields[0] as unknown as { subfields: { code: string; value: string }[] };
+    expect(df.subfields[0]!.value).toBe('Line one Line two');
   });
 
   it('round-trips literal escape strings present in source data', () => {
@@ -221,13 +221,13 @@ describe('marctxt value escapes', () => {
           tag: '500',
           indicator1: ' ',
           indicator2: ' ',
-          subfields: [{ code: 'a', value: 'literal {dollar} and {newline} and {lcub}rcub} braces' }],
+          subfields: [{ code: 'a', value: 'literal {dollar} and {lcub}rcub} braces' }],
         },
       ],
     };
     const parsed = parseMarcTxtRecord(serializeMarcTxtRecord(rec));
-    const df = parsed.fields[0] as { subfields: { code: string; value: string }[] };
-    expect(df.subfields[0]!.value).toBe('literal {dollar} and {newline} and {lcub}rcub} braces');
+    const df = parsed.fields[0] as unknown as { subfields: { code: string; value: string }[] };
+    expect(df.subfields[0]!.value).toBe('literal {dollar} and {lcub}rcub} braces');
   });
 
   it('round-trips a subfield value containing a backslash', () => {
@@ -245,7 +245,7 @@ describe('marctxt value escapes', () => {
     const txt = serializeMarcTxtRecord(rec);
     expect(txt).toContain('{bsol}');
     const parsed = parseMarcTxtRecord(txt);
-    const df = parsed.fields[0] as { subfields: { code: string; value: string }[] };
+    const df = parsed.fields[0] as unknown as { subfields: { code: string; value: string }[] };
     expect(df.subfields[0]!.value).toBe('C:\\Users\\marc');
   });
 
@@ -265,23 +265,23 @@ describe('marctxt value escapes', () => {
     expect(txt).toContain('{lcub}');
     expect(txt).toContain('{rcub}');
     const parsed = parseMarcTxtRecord(txt);
-    const df = parsed.fields[0] as { subfields: { code: string; value: string }[] };
+    const df = parsed.fields[0] as unknown as { subfields: { code: string; value: string }[] };
     expect(df.subfields[0]!.value).toBe('set {a, b, c}');
   });
 
   it('decodes {bsol} from spec-compliant input', () => {
     const txt = '=LDR  00000nam a2200000 a 4500\n=500  \\\\$apath is C:{bsol}Users\n';
     const parsed = parseMarcTxtRecord(txt);
-    const df = parsed.fields[0] as { subfields: { code: string; value: string }[] };
+    const df = parsed.fields[0] as unknown as { subfields: { code: string; value: string }[] };
     expect(df.subfields[0]!.value).toBe('path is C:\\Users');
   });
 
-  it('round-trips a control field value containing a newline', () => {
+  it('replaces embedded newlines in control field values with a space on serialize', () => {
     const rec: MarcRecord = {
       leader: '00000nam a2200000 a 4500',
       fields: [{ tag: '008', data: 'first\nsecond' }],
     };
     const parsed = parseMarcTxtRecord(serializeMarcTxtRecord(rec));
-    expect(parsed.fields[0]).toEqual({ tag: '008', data: 'first\nsecond' });
+    expect(parsed.fields[0]).toEqual({ tag: '008', data: 'first second' });
   });
 });

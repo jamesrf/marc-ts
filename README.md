@@ -547,19 +547,17 @@ Each field occupies one line. Blank indicators are written as `\`. Subfields use
 =650  \1$aHobbits (Fictitious characters)$vFiction.
 ```
 
-**Value escape extension (non-standard).** Standard MARCBreaker has no way to
-represent a literal `$` or an embedded newline in a value, so subfield values
-with either character round-trip lossily through other MARCBreaker tools.
-`marc-ts` escapes these on serialize and unescapes them on parse so the
-round-trip is lossless:
+**Value escaping.** Standard MARCBreaker has no way to represent a literal `$`
+in a value, and `marc-ts` follows the same convention as other tools for the
+remaining reserved characters:
 
 - `$` → `{dollar}`
-- `\n` → `{newline}`
-- `{` → `{lbrace}` (so the escape strings themselves round-trip)
+- `{` → `{lcub}`, `}` → `{rcub}`
+- `\` → `{bsol}`
 
-Source values that do not contain any of these characters are emitted
-verbatim, matching MARCBreaker conventions. Records written by other tools
-(without the escape extension) are read as-is.
+Embedded newlines (`\n`) in field values are replaced with a space on
+serialize, matching the behavior of other MARCBreaker tools. Source values that
+do not contain any of these characters are emitted verbatim.
 
 #### `parseMarcTxt(text): MarcRecord[]`
 

@@ -17,9 +17,6 @@
  *   `$`  → `{dollar}` (subfield delimiter)
  *   `\`  → `{bsol}`   (backslash; reserved as blank-indicator stand-in)
  *
- * Extension (non-standard, marc-ts-specific): embedded newlines in values,
- * which the LC tools don't produce, are escaped as `{newline}` for lossless
- * round-trips.
  */
 
 import type { MarcRecord, ControlField, DataField, Subfield } from './types';
@@ -45,17 +42,16 @@ function escapeValue(s: string): string {
     if (ch === '}') return '{rcub}';
     if (ch === '$') return '{dollar}';
     if (ch === '\\') return '{bsol}';
-    return '{newline}';
+    return ' ';
   });
 }
 
 function unescapeValue(s: string): string {
-  return s.replace(/\{(lcub|rcub|dollar|bsol|newline)\}/g, (_, name) => {
+  return s.replace(/\{(lcub|rcub|dollar|bsol)\}/g, (_, name) => {
     if (name === 'lcub') return '{';
     if (name === 'rcub') return '}';
     if (name === 'dollar') return '$';
-    if (name === 'bsol') return '\\';
-    return '\n';
+    return '\\';
   });
 }
 
