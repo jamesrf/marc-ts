@@ -54,26 +54,40 @@ const SAMPLE_JSON: MarcJsonObject = {
 };
 
 describe('parseMarcJson', () => {
-  it('parses an object', () => {
-    const rec = parseMarcJson(SAMPLE_JSON);
-    expect(rec.leader).toBe('00706cam a2200217 a 4500');
-    expect(rec.fields).toHaveLength(4);
+  it('parses a single object, returning a one-element array', () => {
+    const records = parseMarcJson(SAMPLE_JSON);
+    expect(records).toHaveLength(1);
+    expect(records[0]!.leader).toBe('00706cam a2200217 a 4500');
+    expect(records[0]!.fields).toHaveLength(4);
   });
 
-  it('parses a JSON string', () => {
-    const rec = parseMarcJson(JSON.stringify(SAMPLE_JSON));
-    expect(rec.leader).toBe('00706cam a2200217 a 4500');
+  it('parses a JSON string containing a single object', () => {
+    const records = parseMarcJson(JSON.stringify(SAMPLE_JSON));
+    expect(records).toHaveLength(1);
+    expect(records[0]!.leader).toBe('00706cam a2200217 a 4500');
+  });
+
+  it('parses a JSON string containing an array of objects', () => {
+    const records = parseMarcJson(JSON.stringify([SAMPLE_JSON, SAMPLE_JSON]));
+    expect(records).toHaveLength(2);
+    expect(records[0]!.leader).toBe('00706cam a2200217 a 4500');
+    expect(records[1]!.leader).toBe('00706cam a2200217 a 4500');
+  });
+
+  it('parses a MarcJsonObject[] array', () => {
+    const records = parseMarcJson([SAMPLE_JSON, SAMPLE_JSON]);
+    expect(records).toHaveLength(2);
   });
 
   it('parses control fields', () => {
-    const rec = parseMarcJson(SAMPLE_JSON);
-    expect(rec.fields[0]).toMatchObject({ tag: '001', data: '5490' });
-    expect(rec.fields[1]).toMatchObject({ tag: '003', data: 'OCoLC' });
+    const records = parseMarcJson(SAMPLE_JSON);
+    expect(records[0]!.fields[0]).toMatchObject({ tag: '001', data: '5490' });
+    expect(records[0]!.fields[1]).toMatchObject({ tag: '003', data: 'OCoLC' });
   });
 
   it('parses data fields with indicators and subfields', () => {
-    const rec = parseMarcJson(SAMPLE_JSON);
-    const df = rec.fields[2]! as DataField;
+    const records = parseMarcJson(SAMPLE_JSON);
+    const df = records[0]!.fields[2]! as DataField;
     expect(df.tag).toBe('245');
     expect(df.indicator1).toBe('1');
     expect(df.indicator2).toBe('4');
@@ -94,8 +108,8 @@ describe('parseMarcJson', () => {
         },
       ],
     };
-    const rec = parseMarcJson(json);
-    const df = rec.fields[0]! as DataField;
+    const records = parseMarcJson(json);
+    const df = records[0]!.fields[0]! as DataField;
     expect(df.indicator1).toBe(' ');
     expect(df.indicator2).toBe(' ');
   });
@@ -138,21 +152,27 @@ describe('parseMarcJson', () => {
 });
 
 describe('serializeMarcJson', () => {
-  it('produces a MarcJsonObject', () => {
-    const obj = serializeMarcJson(SAMPLE_RECORD);
-    expect(obj.leader).toBe('00706cam a2200217 a 4500');
-    expect(Array.isArray(obj.fields)).toBe(true);
-    expect(obj.fields).toHaveLength(4);
+  it('produces an array of MarcJsonObjects', () => {
+    const arr = serializeMarcJson([SAMPLE_RECORD]);
+    expect(Array.isArray(arr)).toBe(true);
+    expect(arr).toHaveLength(1);
+    expect(arr[0]!.leader).toBe('00706cam a2200217 a 4500');
+    expect(arr[0]!.fields).toHaveLength(4);
+  });
+
+  it('serializes multiple records', () => {
+    const arr = serializeMarcJson([SAMPLE_RECORD, SAMPLE_RECORD]);
+    expect(arr).toHaveLength(2);
   });
 
   it('serializes control fields as { tag: value }', () => {
-    const obj = serializeMarcJson(SAMPLE_RECORD);
-    expect(obj.fields[0]).toEqual({ '001': '5490' });
+    const arr = serializeMarcJson([SAMPLE_RECORD]);
+    expect(arr[0]!.fields[0]).toEqual({ '001': '5490' });
   });
 
   it('serializes data fields with ind1, ind2, subfields', () => {
-    const obj = serializeMarcJson(SAMPLE_RECORD);
-    const df = obj.fields[2] as { '245': { ind1: string; ind2: string; subfields: object[] } };
+    const arr = serializeMarcJson([SAMPLE_RECORD]);
+    const df = arr[0]!.fields[2] as { '245': { ind1: string; ind2: string; subfields: object[] } };
     expect(df['245'].ind1).toBe('1');
     expect(df['245'].ind2).toBe('4');
     expect(df['245'].subfields).toHaveLength(2);
@@ -160,21 +180,34 @@ describe('serializeMarcJson', () => {
   });
 
   it('round-trips through serialize → parse and produces equal records', () => {
-    const obj = serializeMarcJson(SAMPLE_RECORD);
-    const parsed = parseMarcJson(obj);
-    expect(recordsEqual(SAMPLE_RECORD, parsed)).toBe(true);
+    const arr = serializeMarcJson([SAMPLE_RECORD]);
+    const records = parseMarcJson(arr);
+    expect(recordsEqual(SAMPLE_RECORD, records[0]!)).toBe(true);
   });
 });
 
 describe('serializeMarcJsonString', () => {
-  it('produces valid JSON', () => {
-    const str = serializeMarcJsonString(SAMPLE_RECORD);
-    expect(() => JSON.parse(str)).not.toThrow();
+  it('produces valid JSON string (an array)', () => {
+    const str = serializeMarcJsonString([SAMPLE_RECORD]);
+    const parsed = JSON.parse(str);
+    expect(Array.isArray(parsed)).toBe(true);
   });
 
   it('round-trips through string → parse', () => {
-    const str = serializeMarcJsonString(SAMPLE_RECORD);
-    const parsed = parseMarcJson(str);
-    expect(recordsEqual(SAMPLE_RECORD, parsed)).toBe(true);
+    const str = serializeMarcJsonString([SAMPLE_RECORD]);
+    const records = parseMarcJson(str);
+    expect(recordsEqual(SAMPLE_RECORD, records[0]!)).toBe(true);
+  });
+
+  it('round-trips multiple records', () => {
+    const r2: MarcRecord = {
+      leader: '00000nam a2200000   4500',
+      fields: [{ tag: '001', data: 'second' }],
+    };
+    const str = serializeMarcJsonString([SAMPLE_RECORD, r2]);
+    const records = parseMarcJson(str);
+    expect(records).toHaveLength(2);
+    expect(recordsEqual(SAMPLE_RECORD, records[0]!)).toBe(true);
+    expect((records[1]!.fields[0] as { data: string }).data).toBe('second');
   });
 });

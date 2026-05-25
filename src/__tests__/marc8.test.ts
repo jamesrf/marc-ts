@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { marc8ToUnicode, unicodeToMarc8, unicodeToMarc8WithStats } from '../marc8';
-import { parseMarcRecord } from '../parser';
-import { serializeMarcRecord, serializeMarcRecordWithWarnings } from '../serializer';
+import { parseMarcBinary } from '../parser';
+import { serializeMarcBinary } from '../serializer';
 import { isDataField } from '../types';
 import type { MarcRecord, ControlField, DataField } from '../types';
 
@@ -368,8 +368,8 @@ describe('unicodeToMarc8WithStats', () => {
   });
 });
 
-describe('serializeMarcRecordWithWarnings', () => {
-  it('emits an encoding_error warning for MARC-8 lossy substitutions', () => {
+describe('MARC-8 lossy serialization', () => {
+  it('substitutes ? for unrepresentable characters in MARC-8 output', () => {
     const record: MarcRecord = {
       leader: '00000nam  2200000   4500',
       fields: [
@@ -381,17 +381,14 @@ describe('serializeMarcRecordWithWarnings', () => {
         },
       ],
     };
-    const { warnings } = serializeMarcRecordWithWarnings(record, { encoding: 'marc8' });
-    expect(warnings).toContainEqual(
-      expect.objectContaining({
-        type: 'encoding_error',
-        tag: '245',
-        message: expect.stringContaining('MARC-8 encoding substituted'),
-      })
-    );
+    const buffer = serializeMarcBinary([record], { encoding: 'marc8' });
+    const records = parseMarcBinary(buffer);
+    const df = records[0]?.fields[0] as { subfields: { value: string }[] } | undefined;
+    // Both CJK chars substituted with '?'
+    expect(df?.subfields[0]?.value).toBe('??');
   });
 
-  it('returns no warnings for a clean UTF-8 record', () => {
+  it('round-trips clean ASCII through MARC-8 without substitution', () => {
     const record: MarcRecord = {
       leader: '00000nam a2200000 a 4500',
       fields: [
@@ -403,8 +400,10 @@ describe('serializeMarcRecordWithWarnings', () => {
         },
       ],
     };
-    const { warnings } = serializeMarcRecordWithWarnings(record);
-    expect(warnings).toHaveLength(0);
+    const buffer = serializeMarcBinary([record], { encoding: 'marc8' });
+    const records = parseMarcBinary(buffer);
+    const df = records[0]?.fields[0] as { subfields: { value: string }[] } | undefined;
+    expect(df?.subfields[0]?.value).toBe('Hello');
   });
 });
 
@@ -426,15 +425,15 @@ describe('MARC8 parser integration', () => {
     };
 
     // Serialize as MARC8
-    const buffer = serializeMarcRecord(record, { encoding: 'marc8' });
+    const buffer = serializeMarcBinary([record], { encoding: 'marc8' });
 
     // Leader byte 9 should be ' ' (0x20)
     expect(buffer[9]).toBe(0x20);
 
     // Parse back
-    const result = parseMarcRecord(buffer);
-    expect(result.record).not.toBeNull();
-    expect(result.record?.fields[0]).toMatchObject({ tag: '001', data: 'test001' });
+    const records = parseMarcBinary(buffer);
+    expect(records).toHaveLength(1);
+    expect(records[0]?.fields[0]).toMatchObject({ tag: '001', data: 'test001' });
   });
 
   it('round-trips a simple record through MARC8 serialize → parse', () => {
@@ -451,12 +450,12 @@ describe('MARC8 parser integration', () => {
       ],
     };
 
-    const buffer = serializeMarcRecord(record, { encoding: 'marc8' });
-    const result = parseMarcRecord(buffer);
+    const buffer = serializeMarcBinary([record], { encoding: 'marc8' });
+    const records = parseMarcBinary(buffer);
 
-    expect(result.warnings).toHaveLength(0);
-    expect(result.record?.fields).toHaveLength(2);
-    const df = result.record?.fields[1] as { subfields: { code: string; value: string }[] };
+    expect(records).toHaveLength(1);
+    expect(records[0]?.fields).toHaveLength(2);
+    const df = records[0]?.fields[1] as { subfields: { code: string; value: string }[] };
     expect(df.subfields[0]?.value).toBe('ASCII Title Only');
   });
 
@@ -473,10 +472,10 @@ describe('MARC8 parser integration', () => {
     );
     const buffer = buildMarc8Record([{ tag: '001', data: 'mixed001' }, { tag: '245', rawBytes: titleField }]);
 
-    const result = parseMarcRecord(buffer);
+    const records = parseMarcBinary(buffer);
 
-    expect(result.warnings).toHaveLength(0);
-    const field = result.record?.fields[1];
+    expect(records).toHaveLength(1);
+    const field = records[0]?.fields[1];
     expect(field && isDataField(field) ? field.subfields[0]?.value : undefined).toBe(
       'Greek αβ Hebrew אב'
     );

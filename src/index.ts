@@ -19,9 +19,9 @@ export type {
 export { isControlField, isDataField } from './types';
 
 // Parsing and serialization
-export { parseMarcRecord, parseMarcRecordStrict } from './parser';
-export { serializeMarcRecord, serializeMarcRecordWithWarnings } from './serializer';
-export type { SerializeOptions, SerializeResult } from './serializer';
+export { parseMarcBinary } from './parser';
+export { serializeMarcBinary } from './serializer';
+export type { SerializeOptions } from './serializer';
 
 // MARC8 codec (useful for raw byte-level interop)
 export { marc8ToUnicode, unicodeToMarc8, unicodeToMarc8WithStats } from './marc8';

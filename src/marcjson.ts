@@ -43,15 +43,7 @@ export interface MarcJsonObject {
 
 // ─── Parse ────────────────────────────────────────────────────────────────────
 
-/**
- * Parse a MARC-in-JSON object or JSON string into a MarcRecord.
- *
- * Throws on structural errors (missing `leader`, non-array `fields`,
- * unrecognised field shapes).
- */
-export function parseMarcJson(json: string | MarcJsonObject): MarcRecord {
-  const obj: MarcJsonObject = typeof json === 'string' ? JSON.parse(json) : json;
-
+function parseMarcJsonObject(obj: MarcJsonObject): MarcRecord {
   if (typeof obj.leader !== 'string') {
     throw new Error('MARC-in-JSON: missing or non-string "leader"');
   }
@@ -75,7 +67,6 @@ export function parseMarcJson(json: string | MarcJsonObject): MarcRecord {
     const value = (entry as Record<string, unknown>)[tag];
 
     if (typeof value === 'string') {
-      // Control field
       fields.push({ tag, data: value });
       continue;
     }
@@ -122,12 +113,34 @@ export function parseMarcJson(json: string | MarcJsonObject): MarcRecord {
   return { leader: obj.leader, fields };
 }
 
+/**
+ * Parse one or more MARC-in-JSON records into an array of MarcRecords.
+ *
+ * Accepts:
+ * - A JSON string whose top-level value is an array or a single object
+ * - A `MarcJsonObject[]` array
+ * - A single `MarcJsonObject` (returned as a one-element array)
+ *
+ * Throws on structural errors (missing `leader`, non-array `fields`,
+ * unrecognised field shapes).
+ */
+export function parseMarcJson(json: string | MarcJsonObject | MarcJsonObject[]): MarcRecord[] {
+  if (typeof json === 'string') {
+    const parsed: unknown = JSON.parse(json);
+    if (Array.isArray(parsed)) {
+      return (parsed as MarcJsonObject[]).map(parseMarcJsonObject);
+    }
+    return [parseMarcJsonObject(parsed as MarcJsonObject)];
+  }
+  if (Array.isArray(json)) {
+    return json.map(parseMarcJsonObject);
+  }
+  return [parseMarcJsonObject(json)];
+}
+
 // ─── Serialize ────────────────────────────────────────────────────────────────
 
-/**
- * Serialize a MarcRecord to a MARC-in-JSON plain object.
- */
-export function serializeMarcJson(record: MarcRecord): MarcJsonObject {
+function serializeMarcJsonObject(record: MarcRecord): MarcJsonObject {
   const fields: MarcJsonField[] = record.fields.map((field) => {
     if (isControlField(field)) {
       return { [field.tag]: field.data };
@@ -152,8 +165,15 @@ export function serializeMarcJson(record: MarcRecord): MarcJsonObject {
 }
 
 /**
- * Serialize a MarcRecord to a JSON string.
+ * Serialize an array of MarcRecords to MARC-in-JSON plain objects.
  */
-export function serializeMarcJsonString(record: MarcRecord): string {
-  return JSON.stringify(serializeMarcJson(record));
+export function serializeMarcJson(records: MarcRecord[]): MarcJsonObject[] {
+  return records.map(serializeMarcJsonObject);
+}
+
+/**
+ * Serialize an array of MarcRecords to a JSON string (a JSON array).
+ */
+export function serializeMarcJsonString(records: MarcRecord[]): string {
+  return JSON.stringify(serializeMarcJson(records));
 }

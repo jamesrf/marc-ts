@@ -77,7 +77,7 @@ interface DirectoryEntry {
  * }
  * ```
  */
-export function parseMarcRecord(buffer: Uint8Array, options: ParseOptions = {}): ParseResult {
+function parseMarcRecord(buffer: Uint8Array, options: ParseOptions = {}): ParseResult {
   const strict = options.strict ?? false;
   const maxWarnings = options.maxWarnings ?? 100;
   const warnings: MarcWarning[] = [];
@@ -180,30 +180,40 @@ export function parseMarcRecord(buffer: Uint8Array, options: ParseOptions = {}):
   };
 }
 
+// The RECORD_TERMINATOR byte that separates concatenated ISO2709 records.
+const RECORD_TERMINATOR = 0x1d;
+
 /**
- * Convenience wrapper for strict parsing.
- * Throws an error if parsing fails.
+ * Parse a concatenated ISO2709 binary stream into an array of MARC records.
  *
- * @param buffer - The binary data to parse
- * @returns The parsed MARC record
- * @throws Error if parsing fails
+ * Records in the stream are separated by 0x1D (RECORD_TERMINATOR). Each slice
+ * is parsed with {@link parseMarcRecord}; slices that produce a null record
+ * (e.g. due to encoding errors in lenient mode) are silently skipped.
  *
- * @example
- * ```typescript
- * try {
- *   const record = parseMarcRecordStrict(buffer);
- *   console.log('Title:', title(record));
- * } catch (error) {
- *   console.error('Parsing failed:', error);
- * }
- * ```
+ * @param buffer - Binary data containing one or more concatenated MARC records
+ * @param options - Parsing options forwarded to the per-record parser
+ * @returns Array of successfully parsed MARC records
  */
-export function parseMarcRecordStrict(buffer: Uint8Array): MarcRecord {
-  const result = parseMarcRecord(buffer, { strict: true });
-  if (!result.record) {
-    throw new Error('Failed to parse MARC record in strict mode');
+export function parseMarcBinary(buffer: Uint8Array, options?: ParseOptions): MarcRecord[] {
+  const records: MarcRecord[] = [];
+  let start = 0;
+  for (let i = 0; i < buffer.length; i++) {
+    if (buffer[i] === RECORD_TERMINATOR) {
+      const slice = buffer.slice(start, i + 1);
+      if (slice.length > 0) {
+        const result = parseMarcRecord(slice, options);
+        if (result.record) records.push(result.record);
+      }
+      start = i + 1;
+    }
   }
-  return result.record;
+  // Handle a final record with no trailing terminator
+  if (start < buffer.length) {
+    const slice = buffer.slice(start);
+    const result = parseMarcRecord(slice, options);
+    if (result.record) records.push(result.record);
+  }
+  return records;
 }
 
 /**

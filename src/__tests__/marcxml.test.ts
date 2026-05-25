@@ -1,9 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   parseMarcXml,
-  parseMarcXmlRecord,
   serializeMarcXml,
-  serializeMarcXmlRecord,
 } from '../marcxml';
 import type { MarcRecord } from '../types';
 
@@ -129,49 +127,6 @@ describe('parseMarcXml', () => {
   });
 });
 
-describe('parseMarcXmlRecord', () => {
-  it('returns the first record', () => {
-    const rec = parseMarcXmlRecord(SAMPLE_XML);
-    expect(rec.leader).toBe('00706cam a2200217 a 4500');
-  });
-
-  it('throws when no record is found', () => {
-    expect(() => parseMarcXmlRecord('<collection/>')).toThrow(/no marc record/i);
-  });
-});
-
-describe('serializeMarcXmlRecord', () => {
-  it('produces a <record> element', () => {
-    const xml = serializeMarcXmlRecord(SAMPLE_RECORD);
-    expect(xml).toContain('<record');
-    expect(xml).toContain('</record>');
-  });
-
-  it('includes the leader', () => {
-    const xml = serializeMarcXmlRecord(SAMPLE_RECORD);
-    expect(xml).toContain('<leader>00706cam a2200217 a 4500</leader>');
-  });
-
-  it('includes control fields', () => {
-    const xml = serializeMarcXmlRecord(SAMPLE_RECORD);
-    expect(xml).toContain('<controlfield tag="001">5490</controlfield>');
-  });
-
-  it('includes data fields with indicators', () => {
-    const xml = serializeMarcXmlRecord(SAMPLE_RECORD);
-    expect(xml).toContain('<datafield tag="245" ind1="1" ind2="4">');
-    expect(xml).toContain('<subfield code="a">The Hobbit /</subfield>');
-  });
-
-  it('escapes special XML characters in values', () => {
-    const rec: MarcRecord = {
-      leader: '00000nam a2200000   4500',
-      fields: [{ tag: '001', data: 'A & B < C > D' }],
-    };
-    const xml = serializeMarcXmlRecord(rec);
-    expect(xml).toContain('A &amp; B &lt; C &gt; D');
-  });
-});
 
 describe('serializeMarcXml', () => {
   it('wraps records in a <collection> element', () => {
@@ -183,6 +138,31 @@ describe('serializeMarcXml', () => {
   it('includes an XML declaration', () => {
     const xml = serializeMarcXml([SAMPLE_RECORD]);
     expect(xml).toContain('<?xml version="1.0"');
+  });
+
+  it('includes the leader', () => {
+    const xml = serializeMarcXml([SAMPLE_RECORD]);
+    expect(xml).toContain('<leader>00706cam a2200217 a 4500</leader>');
+  });
+
+  it('includes control fields', () => {
+    const xml = serializeMarcXml([SAMPLE_RECORD]);
+    expect(xml).toContain('<controlfield tag="001">5490</controlfield>');
+  });
+
+  it('includes data fields with indicators and subfields', () => {
+    const xml = serializeMarcXml([SAMPLE_RECORD]);
+    expect(xml).toContain('<datafield tag="245" ind1="1" ind2="4">');
+    expect(xml).toContain('<subfield code="a">The Hobbit /</subfield>');
+  });
+
+  it('escapes special XML characters in values', () => {
+    const rec: MarcRecord = {
+      leader: '00000nam a2200000   4500',
+      fields: [{ tag: '001', data: 'A & B < C > D' }],
+    };
+    const xml = serializeMarcXml([rec]);
+    expect(xml).toContain('A &amp; B &lt; C &gt; D');
   });
 
   it('serializes multiple records', () => {
@@ -213,13 +193,13 @@ describe('escapeXml control character handling', () => {
         },
       ],
     };
-    const xml = serializeMarcXmlRecord(rec);
+    const xml = serializeMarcXml([rec]);
     expect(xml).not.toMatch(/\x07/);
     expect(xml).toContain('before�after');
 
     // And the produced XML must remain parseable.
-    const parsed = parseMarcXmlRecord(xml);
-    const df = parsed.fields[0] as { subfields: { code: string; value: string }[] };
+    const parsed = parseMarcXml(xml)[0]!;
+    const df = parsed.fields[0] as unknown as { subfields: { code: string; value: string }[] };
     expect(df.subfields[0]!.value).toBe('before�after');
   });
 
@@ -235,10 +215,10 @@ describe('escapeXml control character handling', () => {
         },
       ],
     };
-    const xml = serializeMarcXmlRecord(rec);
+    const xml = serializeMarcXml([rec]);
     expect(xml).toContain('&#13;');
-    const parsed = parseMarcXmlRecord(xml);
-    const df = parsed.fields[0] as { subfields: { code: string; value: string }[] };
+    const parsed = parseMarcXml(xml)[0]!;
+    const df = parsed.fields[0] as unknown as { subfields: { code: string; value: string }[] };
     expect(df.subfields[0]!.value).toBe('line1\rline2');
   });
 });

@@ -138,23 +138,9 @@ export function parseMarcTxt(text: string): MarcRecord[] {
   return records;
 }
 
-/**
- * Parse a marctxt string expected to contain exactly one record.
- * Throws if no record is found.
- */
-export function parseMarcTxtRecord(text: string): MarcRecord {
-  const records = parseMarcTxt(text);
-  if (records.length === 0) throw new Error('No MARC record found in marctxt input');
-  return records[0]!;
-}
-
 // ─── Serializer ───────────────────────────────────────────────────────────────
 
-/**
- * Serialize a single MarcRecord to marctxt format.
- * Returns a string with one field per line and a trailing newline.
- */
-export function serializeMarcTxtRecord(record: MarcRecord): string {
+function serializeMarcTxtRecord(record: MarcRecord): string {
   const lines: string[] = [];
 
   lines.push(`=LDR  ${record.leader}`);

@@ -262,26 +262,13 @@ export function parseMarcXml(xml: string): MarcRecord[] {
   return records;
 }
 
-/**
- * Parse a MARCXML string expected to contain exactly one `<record>`.
- * Throws if no record is found.
- */
-export function parseMarcXmlRecord(xml: string): MarcRecord {
-  const records = parseMarcXml(xml);
-  if (records.length === 0) throw new Error('No MARC record found in MARCXML input');
-  return records[0]!;
-}
-
 // ─── MARCXML serializer ───────────────────────────────────────────────────────
 
 const XML_HEADER = '<?xml version="1.0" encoding="UTF-8"?>\n';
 const COLLECTION_NS = 'xmlns="http://www.loc.gov/MARC21/slim"';
 const INDENT = '  ';
 
-/**
- * Serialize a single MarcRecord to a `<record>` XML element string (no collection wrapper).
- */
-export function serializeMarcXmlRecord(record: MarcRecord): string {
+function serializeMarcXmlRecord(record: MarcRecord): string {
   const lines: string[] = [`<record ${COLLECTION_NS}>`];
   lines.push(`${INDENT}<leader>${escapeXml(record.leader)}</leader>`);
 

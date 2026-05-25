@@ -1,9 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   parseMarcTxt,
-  parseMarcTxtRecord,
   serializeMarcTxt,
-  serializeMarcTxtRecord,
 } from '../marctxt';
 import { recordsEqual } from '../clone';
 import type { MarcRecord } from '../types';
@@ -112,51 +110,33 @@ describe('=000 leader (LC spec form)', () => {
   });
 });
 
-describe('parseMarcTxtRecord', () => {
-  it('returns the first record', () => {
-    const rec = parseMarcTxtRecord(SAMPLE_TXT);
-    expect(rec.leader).toBe('00706cam a2200217 a 4500');
-  });
 
-  it('throws when no record is found', () => {
-    expect(() => parseMarcTxtRecord('')).toThrow(/no marc record/i);
-  });
-});
-
-describe('serializeMarcTxtRecord', () => {
+describe('serializeMarcTxt', () => {
   it('produces a =LDR line', () => {
-    const txt = serializeMarcTxtRecord(SAMPLE_RECORD);
+    const txt = serializeMarcTxt([SAMPLE_RECORD]);
     expect(txt).toContain('=LDR  00706cam a2200217 a 4500');
   });
 
   it('produces control field lines', () => {
-    const txt = serializeMarcTxtRecord(SAMPLE_RECORD);
+    const txt = serializeMarcTxt([SAMPLE_RECORD]);
     expect(txt).toContain('=001  5490');
     expect(txt).toContain('=003  OCoLC');
   });
 
   it('produces data field lines with indicators', () => {
-    const txt = serializeMarcTxtRecord(SAMPLE_RECORD);
+    const txt = serializeMarcTxt([SAMPLE_RECORD]);
     expect(txt).toContain('=245  14$aThe Hobbit /$cJ.R.R. Tolkien.');
   });
 
   it('encodes blank indicator as `\\`', () => {
-    const txt = serializeMarcTxtRecord(SAMPLE_RECORD);
+    const txt = serializeMarcTxt([SAMPLE_RECORD]);
     expect(txt).toContain('=650  \\1$aHobbits (Fictitious characters)');
   });
 
-  it('ends with a trailing newline', () => {
-    const txt = serializeMarcTxtRecord(SAMPLE_RECORD);
-    expect(txt.endsWith('\n')).toBe(true);
-  });
-});
-
-describe('serializeMarcTxt', () => {
   it('separates multiple records with a blank line', () => {
     const txt = serializeMarcTxt([SAMPLE_RECORD, SAMPLE_RECORD]);
     const ldrMatches = txt.match(/^=LDR/gm) ?? [];
     expect(ldrMatches).toHaveLength(2);
-    // blank line between records
     expect(txt).toContain('\n\n');
   });
 
@@ -189,7 +169,7 @@ describe('marctxt value escapes', () => {
         },
       ],
     };
-    const parsed = parseMarcTxtRecord(serializeMarcTxtRecord(rec));
+    const parsed = parseMarcTxt(serializeMarcTxt([rec]))[0]!;
     expect(parsed.fields).toHaveLength(1);
     const df = parsed.fields[0] as unknown as { subfields: { code: string; value: string }[] };
     expect(df.subfields).toHaveLength(1);
@@ -208,7 +188,7 @@ describe('marctxt value escapes', () => {
         },
       ],
     };
-    const parsed = parseMarcTxtRecord(serializeMarcTxtRecord(rec));
+    const parsed = parseMarcTxt(serializeMarcTxt([rec]))[0]!;
     const df = parsed.fields[0] as unknown as { subfields: { code: string; value: string }[] };
     expect(df.subfields[0]!.value).toBe('Line one Line two');
   });
@@ -225,7 +205,7 @@ describe('marctxt value escapes', () => {
         },
       ],
     };
-    const parsed = parseMarcTxtRecord(serializeMarcTxtRecord(rec));
+    const parsed = parseMarcTxt(serializeMarcTxt([rec]))[0]!;
     const df = parsed.fields[0] as unknown as { subfields: { code: string; value: string }[] };
     expect(df.subfields[0]!.value).toBe('literal {dollar} and {lcub}rcub} braces');
   });
@@ -242,9 +222,9 @@ describe('marctxt value escapes', () => {
         },
       ],
     };
-    const txt = serializeMarcTxtRecord(rec);
+    const txt = serializeMarcTxt([rec]);
     expect(txt).toContain('{bsol}');
-    const parsed = parseMarcTxtRecord(txt);
+    const parsed = parseMarcTxt(txt)[0]!;
     const df = parsed.fields[0] as unknown as { subfields: { code: string; value: string }[] };
     expect(df.subfields[0]!.value).toBe('C:\\Users\\marc');
   });
@@ -261,17 +241,17 @@ describe('marctxt value escapes', () => {
         },
       ],
     };
-    const txt = serializeMarcTxtRecord(rec);
+    const txt = serializeMarcTxt([rec]);
     expect(txt).toContain('{lcub}');
     expect(txt).toContain('{rcub}');
-    const parsed = parseMarcTxtRecord(txt);
+    const parsed = parseMarcTxt(txt)[0]!;
     const df = parsed.fields[0] as unknown as { subfields: { code: string; value: string }[] };
     expect(df.subfields[0]!.value).toBe('set {a, b, c}');
   });
 
   it('decodes {bsol} from spec-compliant input', () => {
     const txt = '=LDR  00000nam a2200000 a 4500\n=500  \\\\$apath is C:{bsol}Users\n';
-    const parsed = parseMarcTxtRecord(txt);
+    const parsed = parseMarcTxt(txt)[0]!;
     const df = parsed.fields[0] as unknown as { subfields: { code: string; value: string }[] };
     expect(df.subfields[0]!.value).toBe('path is C:\\Users');
   });
@@ -281,7 +261,7 @@ describe('marctxt value escapes', () => {
       leader: '00000nam a2200000 a 4500',
       fields: [{ tag: '008', data: 'first\nsecond' }],
     };
-    const parsed = parseMarcTxtRecord(serializeMarcTxtRecord(rec));
+    const parsed = parseMarcTxt(serializeMarcTxt([rec]))[0]!;
     expect(parsed.fields[0]).toEqual({ tag: '008', data: 'first second' });
   });
 });

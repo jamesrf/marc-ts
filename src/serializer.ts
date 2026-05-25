@@ -58,7 +58,7 @@ const STARTING_POSITION_SIZE = 5;
  * // Can now be written to file or transmitted
  * ```
  */
-export function serializeMarcRecord(
+function serializeMarcRecord(
   record: MarcRecord,
   options: SerializeOptions = {}
 ): Uint8Array {
@@ -81,7 +81,7 @@ export interface SerializeResult {
  * example, MARC-8 output of records containing characters with no MARC-8
  * equivalent.
  */
-export function serializeMarcRecordWithWarnings(
+function serializeMarcRecordWithWarnings(
   record: MarcRecord,
   options: SerializeOptions = {}
 ): SerializeResult {
@@ -290,4 +290,26 @@ function buildLeader(
   leader = leader.substring(0, 9) + (useMarc8 ? ' ' : 'a') + leader.substring(10);
 
   return leader;
+}
+
+/**
+ * Serialize an array of MARC records to a concatenated ISO2709 binary stream.
+ *
+ * Each record is individually serialized (with its own 0x1D terminator) and
+ * the results are concatenated into a single Uint8Array.
+ *
+ * @param records - MARC records to serialize
+ * @param options - Encoding options forwarded to the per-record serializer
+ * @returns Concatenated binary representation of all records
+ */
+export function serializeMarcBinary(records: MarcRecord[], options: SerializeOptions = {}): Uint8Array {
+  const parts = records.map((r) => serializeMarcRecord(r, options));
+  const totalLength = parts.reduce((n, p) => n + p.length, 0);
+  const out = new Uint8Array(totalLength);
+  let offset = 0;
+  for (const part of parts) {
+    out.set(part, offset);
+    offset += part.length;
+  }
+  return out;
 }
