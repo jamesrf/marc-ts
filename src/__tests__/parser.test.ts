@@ -4,9 +4,6 @@ import { serializeMarcBinary } from '../serializer';
 import type { MarcRecord, DataField } from '../types';
 import * as marc8Module from '../marc8';
 
-// Internal parseMarcRecord is no longer exported; use parseMarcBinary which
-// wraps it. These helpers build single-record buffers for low-level tests.
-
 function encodeAscii(text: string): Uint8Array {
   return new TextEncoder().encode(text);
 }

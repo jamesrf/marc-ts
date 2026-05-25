@@ -3,10 +3,7 @@
  * Re-exports types and provides utility functions.
  */
 
-import type { MarcWarning, MarcWarningType, ParseOptions, ParseResult } from './types';
-
-// Re-export types for convenience
-export type { MarcWarning, MarcWarningType, ParseOptions, ParseResult };
+import type { MarcWarning, MarcWarningType } from './types';
 
 /**
  * Create a warning object.

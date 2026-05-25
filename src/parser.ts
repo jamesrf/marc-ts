@@ -56,27 +56,6 @@ interface DirectoryEntry {
   startingPosition: number;
 }
 
-/**
- * Parse a MARC21 record from ISO2709 binary format.
- *
- * @param buffer - The binary data to parse (use Uint8Array for browser compatibility)
- * @param options - Parsing options (strict mode, max warnings)
- * @returns Parse result containing the record and any warnings
- *
- * @example
- * ```typescript
- * const buffer = new Uint8Array([...]); // MARC21 binary data
- * const result = parseMarcRecord(buffer);
- *
- * if (result.record) {
- *   console.log('Parsed successfully');
- * }
- *
- * if (result.warnings.length > 0) {
- *   console.warn('Warnings:', result.warnings);
- * }
- * ```
- */
 function parseMarcRecord(buffer: Uint8Array, options: ParseOptions = {}): ParseResult {
   const strict = options.strict ?? false;
   const maxWarnings = options.maxWarnings ?? 100;

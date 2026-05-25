@@ -11,7 +11,6 @@ export type {
   DataField,
   Subfield,
   ParseOptions,
-  ParseResult,
   MarcWarning,
   MarcWarningType,
 } from './types';
