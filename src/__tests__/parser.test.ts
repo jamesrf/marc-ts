@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { parseMarcBinary } from '../parser';
+import { parseMarcBinary, parseMarcBinaryWithWarnings } from '../parser';
 import { serializeMarcBinary } from '../serializer';
 import type { MarcRecord, DataField } from '../types';
 import * as marc8Module from '../marc8';
@@ -720,5 +720,110 @@ describe('parseMarcBinary', () => {
       const records = parseMarcBinary(buffer, { maxWarnings: 2 });
       expect(Array.isArray(records)).toBe(true);
     });
+  });
+});
+
+describe('parseMarcBinaryWithWarnings', () => {
+  it('returns per-record results for valid records', () => {
+    const r1: MarcRecord = {
+      leader: '00000nam  2200000   4500',
+      fields: [{ tag: '001', data: 'rec1' }],
+    };
+    const r2: MarcRecord = {
+      leader: '00000nam  2200000   4500',
+      fields: [{ tag: '001', data: 'rec2' }],
+    };
+    const buffer = serializeMarcBinary([r1, r2]);
+    const batch = parseMarcBinaryWithWarnings(buffer);
+
+    expect(batch.results).toHaveLength(2);
+    expect(batch.results[0]!.record).not.toBeNull();
+    expect(batch.results[1]!.record).not.toBeNull();
+    expect(batch.results[0]!.warnings).toEqual([]);
+    expect(batch.results[1]!.warnings).toEqual([]);
+  });
+
+  it('includes failed records with their warnings', () => {
+    const good: MarcRecord = {
+      leader: '00000nam  2200000   4500',
+      fields: [{ tag: '001', data: 'good' }],
+    };
+    const goodBuf = serializeMarcBinary([good]);
+
+    // A truncated record that's too short to parse
+    const bad = new Uint8Array([0x41, 0x42, 0x1d]);
+
+    const combined = new Uint8Array(goodBuf.length + bad.length);
+    combined.set(goodBuf, 0);
+    combined.set(bad, goodBuf.length);
+
+    const batch = parseMarcBinaryWithWarnings(combined);
+
+    expect(batch.results).toHaveLength(2);
+    expect(batch.results[0]!.record).not.toBeNull();
+    expect(batch.results[1]!.record).toBeNull();
+    expect(batch.results[1]!.warnings.length).toBeGreaterThan(0);
+    expect(batch.results[1]!.warnings[0]!.type).toBe('truncated_record');
+  });
+
+  it('returns same records as parseMarcBinary for valid input', () => {
+    const records: MarcRecord[] = [
+      {
+        leader: '00000nam  2200000   4500',
+        fields: [
+          { tag: '001', data: 'id1' },
+          {
+            tag: '245',
+            indicator1: '1',
+            indicator2: '0',
+            subfields: [{ code: 'a', value: 'Title One' }],
+          },
+        ],
+      },
+      {
+        leader: '00000nam  2200000   4500',
+        fields: [{ tag: '001', data: 'id2' }],
+      },
+    ];
+    const buffer = serializeMarcBinary(records);
+
+    const plain = parseMarcBinary(buffer);
+    const batch = parseMarcBinaryWithWarnings(buffer);
+    const batchRecords = batch.results
+      .map((r) => r.record)
+      .filter((r): r is MarcRecord => r !== null);
+
+    expect(batchRecords).toEqual(plain);
+  });
+
+  it('throws in strict mode on the first error', () => {
+    const bad = new Uint8Array([0x41, 0x42, 0x1d]);
+    expect(() => parseMarcBinaryWithWarnings(bad, { strict: true })).toThrow();
+  });
+
+  it('respects maxWarnings per record', () => {
+    // Build a record with many out-of-bounds directory entries to generate many warnings
+    const buffer = buildMalformedRecord(
+      '00073nam  2200073   4500',
+      '245000500999650000500998700000500997'
+    );
+    const batch = parseMarcBinaryWithWarnings(buffer, { maxWarnings: 1 });
+
+    expect(batch.results).toHaveLength(1);
+    // maxWarnings=1 means at most ~2 warnings (1 real + 1 truncation)
+    expect(batch.results[0]!.warnings.length).toBeLessThanOrEqual(3);
+  });
+
+  it('handles a final record with no trailing terminator', () => {
+    const record: MarcRecord = {
+      leader: '00000nam  2200000   4500',
+      fields: [{ tag: '001', data: 'noterm' }],
+    };
+    const buf = serializeMarcBinary([record]);
+    const noTerm = buf.slice(0, buf.length - 1);
+    const batch = parseMarcBinaryWithWarnings(noTerm);
+
+    expect(batch.results).toHaveLength(1);
+    expect(batch.results[0]!.record).not.toBeNull();
   });
 });

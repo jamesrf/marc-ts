@@ -3,7 +3,7 @@
  * Converts MarcRecord objects back to binary format.
  */
 
-import type { MarcRecord, ControlField, DataField, MarcWarning } from './types';
+import type { MarcRecord, ControlField, DataField, MarcWarning, SerializeRecordResult, SerializeBatchResult } from './types';
 import { isControlField } from './types';
 import { unicodeToMarc8WithStats } from './marc8';
 import { createWarning } from './warnings';
@@ -20,6 +20,12 @@ export interface SerializeOptions {
    *   to ASCII plus ANSEL Latin/combining characters.
    */
   readonly encoding?: 'utf8' | 'marc8';
+
+  /**
+   * Maximum number of warnings to collect per record before stopping.
+   * Default: 100
+   */
+  readonly maxWarnings?: number;
 }
 
 // ISO2709 separator characters
@@ -40,24 +46,20 @@ function serializeMarcRecord(
   return serializeMarcRecordWithWarnings(record, options).bytes;
 }
 
-interface SerializeResult {
-  readonly bytes: Uint8Array;
-  readonly warnings: readonly MarcWarning[];
-}
-
 function serializeMarcRecordWithWarnings(
   record: MarcRecord,
   options: SerializeOptions = {}
-): SerializeResult {
+): SerializeRecordResult {
   validateRecord(record);
   const warnings: MarcWarning[] = [];
+  const maxWarnings = options.maxWarnings ?? 100;
 
   const useMarc8 = options.encoding === 'marc8';
   const encoder = new TextEncoder();
   const encodeText: (s: string, tag?: string) => Uint8Array = useMarc8
     ? (s, tag) => {
         const result = unicodeToMarc8WithStats(s);
-        if (result.lossyCount > 0) {
+        if (result.lossyCount > 0 && warnings.length < maxWarnings) {
           warnings.push(
             createWarning(
               'encoding_error',
@@ -276,4 +278,32 @@ export function serializeMarcBinary(records: MarcRecord[], options: SerializeOpt
     offset += part.length;
   }
   return out;
+}
+
+/**
+ * Serialize an array of MARC records to a concatenated ISO2709 binary
+ * stream, returning per-record serialization warnings.
+ */
+export function serializeMarcBinaryWithWarnings(
+  records: MarcRecord[],
+  options: SerializeOptions = {}
+): SerializeBatchResult {
+  const results: SerializeRecordResult[] = [];
+  const parts: Uint8Array[] = [];
+
+  for (const record of records) {
+    const result = serializeMarcRecordWithWarnings(record, options);
+    results.push(result);
+    parts.push(result.bytes);
+  }
+
+  const totalLength = parts.reduce((n, p) => n + p.length, 0);
+  const bytes = new Uint8Array(totalLength);
+  let offset = 0;
+  for (const part of parts) {
+    bytes.set(part, offset);
+    offset += part.length;
+  }
+
+  return { bytes, results };
 }

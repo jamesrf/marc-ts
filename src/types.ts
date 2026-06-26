@@ -129,6 +129,31 @@ export interface ParseResult {
 }
 
 /**
+ * Result of parsing multiple MARC records with warning capture.
+ * Each entry pairs a parsed record (or null on failure) with its warnings.
+ */
+export interface ParseBatchResult {
+  readonly results: readonly ParseResult[];
+}
+
+/**
+ * Result of serializing a single MARC record with warning capture.
+ */
+export interface SerializeRecordResult {
+  readonly bytes: Uint8Array;
+  readonly warnings: readonly MarcWarning[];
+}
+
+/**
+ * Result of serializing multiple MARC records with warning capture.
+ * Contains the concatenated bytes and per-record results.
+ */
+export interface SerializeBatchResult {
+  readonly bytes: Uint8Array;
+  readonly results: readonly SerializeRecordResult[];
+}
+
+/**
  * Type guard to check if a field is a control field.
  *
  * @param field - The field to check

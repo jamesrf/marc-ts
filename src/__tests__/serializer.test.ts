@@ -1,7 +1,8 @@
-import { describe, it, expect } from 'vitest';
-import { serializeMarcBinary } from '../serializer';
+import { describe, it, expect, vi } from 'vitest';
+import { serializeMarcBinary, serializeMarcBinaryWithWarnings } from '../serializer';
 import { parseMarcBinary } from '../parser';
 import type { MarcRecord } from '../types';
+import * as marc8Module from '../marc8';
 
 describe('serializeMarcBinary', () => {
   it('serializes a single record', () => {
@@ -146,5 +147,125 @@ describe('serializeMarcBinary', () => {
       };
       expect(() => serializeMarcBinary([record])).toThrow(/subfield code must be an ASCII printable character/);
     });
+  });
+});
+
+describe('serializeMarcBinaryWithWarnings', () => {
+  it('returns bytes matching serializeMarcBinary for the same input', () => {
+    const records: MarcRecord[] = [
+      {
+        leader: '00000nam  2200000   4500',
+        fields: [
+          { tag: '001', data: 'id1' },
+          {
+            tag: '245',
+            indicator1: '1',
+            indicator2: '0',
+            subfields: [{ code: 'a', value: 'Title' }],
+          },
+        ],
+      },
+      {
+        leader: '00000nam  2200000   4500',
+        fields: [{ tag: '001', data: 'id2' }],
+      },
+    ];
+
+    const plain = serializeMarcBinary(records);
+    const batch = serializeMarcBinaryWithWarnings(records);
+
+    expect(batch.bytes).toEqual(plain);
+    expect(batch.results).toHaveLength(2);
+  });
+
+  it('returns no warnings for UTF-8 encoding', () => {
+    const records: MarcRecord[] = [
+      {
+        leader: '00000nam  2200000   4500',
+        fields: [
+          {
+            tag: '245',
+            indicator1: '1',
+            indicator2: '0',
+            subfields: [{ code: 'a', value: 'Héllo Wörld' }],
+          },
+        ],
+      },
+    ];
+
+    const batch = serializeMarcBinaryWithWarnings(records);
+    expect(batch.results[0]!.warnings).toEqual([]);
+  });
+
+  it('captures MARC-8 lossy encoding warnings per record', () => {
+    vi.spyOn(marc8Module, 'unicodeToMarc8WithStats').mockReturnValue({
+      bytes: new Uint8Array([0x3f]),
+      lossyCount: 2,
+    });
+
+    try {
+      const records: MarcRecord[] = [
+        {
+          leader: '00000nam  2200000   4500',
+          fields: [{ tag: '001', data: 'rec1' }],
+        },
+        {
+          leader: '00000nam  2200000   4500',
+          fields: [{ tag: '001', data: 'rec2' }],
+        },
+      ];
+
+      const batch = serializeMarcBinaryWithWarnings(records, { encoding: 'marc8' });
+
+      expect(batch.results).toHaveLength(2);
+      expect(batch.results[0]!.warnings.length).toBeGreaterThan(0);
+      expect(batch.results[0]!.warnings[0]!.type).toBe('encoding_error');
+      expect(batch.results[0]!.warnings[0]!.message).toContain('MARC-8');
+      expect(batch.results[1]!.warnings.length).toBeGreaterThan(0);
+    } finally {
+      vi.restoreAllMocks();
+    }
+  });
+
+  it('respects maxWarnings in MARC-8 encoding', () => {
+    let callCount = 0;
+    vi.spyOn(marc8Module, 'unicodeToMarc8WithStats').mockImplementation(() => {
+      callCount++;
+      return { bytes: new Uint8Array([0x3f]), lossyCount: 1 };
+    });
+
+    try {
+      const record: MarcRecord = {
+        leader: '00000nam  2200000   4500',
+        fields: [
+          { tag: '001', data: 'f1' },
+          {
+            tag: '245',
+            indicator1: '1',
+            indicator2: '0',
+            subfields: [
+              { code: 'a', value: 'A' },
+              { code: 'b', value: 'B' },
+              { code: 'c', value: 'C' },
+            ],
+          },
+        ],
+      };
+
+      const batch = serializeMarcBinaryWithWarnings([record], {
+        encoding: 'marc8',
+        maxWarnings: 2,
+      });
+
+      expect(batch.results[0]!.warnings.length).toBeLessThanOrEqual(2);
+    } finally {
+      vi.restoreAllMocks();
+    }
+  });
+
+  it('returns empty results for empty input', () => {
+    const batch = serializeMarcBinaryWithWarnings([]);
+    expect(batch.bytes.length).toBe(0);
+    expect(batch.results).toEqual([]);
   });
 });

@@ -69,9 +69,27 @@ const strict = parseMarcBinary(buffer, { strict: true });
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `strict` | `boolean` | `false` | Throw on fatal parse errors instead of skipping |
-| `maxWarnings` | `number` | `100` | Stop collecting warnings after this many |
+| `maxWarnings` | `number` | `100` | Stop collecting warnings after this many (per record) |
 
 **Character encoding.** Leader byte 9 controls decoding: `'a'` = UTF-8, `' '` (space) = MARC-8. MARC-8 decoding handles ANSEL Latin, Greek, Hebrew, Cyrillic, Arabic, and subscript/superscript scripts via escape-designated sequences. EACC/CJK coverage is limited (~33 of ~16,000 official triples); records with substantial CJK content will mostly decode to U+FFFD — prefer UTF-8 sources for CJK catalogs.
+
+#### `parseMarcBinaryWithWarnings(buffer, options?): ParseBatchResult`
+
+Same as `parseMarcBinary`, but returns per-record parse results with warnings. Records that fail to parse are included (with `record: null`) so callers can inspect their warnings.
+
+```typescript
+import { parseMarcBinaryWithWarnings } from 'marc-ts';
+
+const { results } = parseMarcBinaryWithWarnings(buffer);
+for (const [i, result] of results.entries()) {
+  if (result.warnings.length > 0) {
+    console.log(`Record ${i}: ${result.warnings.length} warnings`);
+  }
+  if (!result.record) {
+    console.log(`Record ${i} failed to parse`, result.warnings);
+  }
+}
+```
 
 #### `serializeMarcBinary(records, options?): Uint8Array`
 
@@ -87,6 +105,22 @@ const marc8Buffer = serializeMarcBinary(records, { encoding: 'marc8' });
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `encoding` | `'utf8' \| 'marc8'` | `'utf8'` | Character encoding; `'marc8'` replaces unsupported Unicode with `?` |
+| `maxWarnings` | `number` | `100` | Stop collecting warnings after this many (per record) |
+
+#### `serializeMarcBinaryWithWarnings(records, options?): SerializeBatchResult`
+
+Same as `serializeMarcBinary`, but returns per-record serialization warnings alongside the concatenated bytes. Useful for detecting lossy MARC-8 encoding.
+
+```typescript
+import { serializeMarcBinaryWithWarnings } from 'marc-ts';
+
+const { bytes, results } = serializeMarcBinaryWithWarnings(records, { encoding: 'marc8' });
+for (const [i, result] of results.entries()) {
+  if (result.warnings.length > 0) {
+    console.log(`Record ${i}: ${result.warnings.length} encoding warnings`);
+  }
+}
+```
 
 ---
 

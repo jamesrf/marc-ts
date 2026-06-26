@@ -11,6 +11,10 @@ export type {
   DataField,
   Subfield,
   ParseOptions,
+  ParseResult,
+  ParseBatchResult,
+  SerializeRecordResult,
+  SerializeBatchResult,
   MarcWarning,
   MarcWarningType,
 } from './types';
@@ -18,8 +22,8 @@ export type {
 export { isControlField, isDataField } from './types';
 
 // Parsing and serialization
-export { parseMarcBinary } from './parser';
-export { serializeMarcBinary } from './serializer';
+export { parseMarcBinary, parseMarcBinaryWithWarnings } from './parser';
+export { serializeMarcBinary, serializeMarcBinaryWithWarnings } from './serializer';
 export type { SerializeOptions } from './serializer';
 
 // MARC8 codec (useful for raw byte-level interop)

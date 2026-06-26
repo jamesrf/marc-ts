@@ -10,6 +10,7 @@ import type {
   Subfield,
   ParseOptions,
   ParseResult,
+  ParseBatchResult,
   MarcWarning,
   MarcWarningType,
 } from './types';
@@ -193,6 +194,39 @@ export function parseMarcBinary(buffer: Uint8Array, options?: ParseOptions): Mar
     if (result.record) records.push(result.record);
   }
   return records;
+}
+
+/**
+ * Parse a concatenated ISO2709 binary stream, returning per-record
+ * parse results including any warnings.
+ *
+ * Unlike {@link parseMarcBinary}, records that fail to parse are
+ * included in the results array (with `record: null`) so callers
+ * can inspect their warnings.
+ */
+export function parseMarcBinaryWithWarnings(
+  buffer: Uint8Array,
+  options?: ParseOptions
+): ParseBatchResult {
+  const results: ParseResult[] = [];
+  let start = 0;
+
+  for (let i = 0; i < buffer.length; i++) {
+    if (buffer[i] === RECORD_TERMINATOR) {
+      const slice = buffer.slice(start, i + 1);
+      if (slice.length > 0) {
+        results.push(parseMarcRecord(slice, options));
+      }
+      start = i + 1;
+    }
+  }
+
+  if (start < buffer.length) {
+    const slice = buffer.slice(start);
+    results.push(parseMarcRecord(slice, options));
+  }
+
+  return { results };
 }
 
 /**
