@@ -33,20 +33,17 @@ const ENTITY_MAP: ReadonlyMap<string, string> = new Map([
 ]);
 
 function unescapeXml(text: string): string {
-  return text.replace(
-    /&(?:#x([0-9a-fA-F]+)|#([0-9]+)|([a-zA-Z]+));/g,
-    (_, hex, dec, name) => {
-      if (hex !== undefined) {
-        const cp = parseInt(hex, 16);
-        return cp >= 0 && cp <= 0x10ffff ? String.fromCodePoint(cp) : '�';
-      }
-      if (dec !== undefined) {
-        const cp = parseInt(dec, 10);
-        return cp >= 0 && cp <= 0x10ffff ? String.fromCodePoint(cp) : '�';
-      }
-      return ENTITY_MAP.get(name) ?? _;
-    },
-  );
+  return text.replace(/&(?:#x([0-9a-fA-F]+)|#([0-9]+)|([a-zA-Z]+));/g, (_, hex, dec, name) => {
+    if (hex !== undefined) {
+      const cp = parseInt(hex, 16);
+      return cp >= 0 && cp <= 0x10ffff ? String.fromCodePoint(cp) : '�';
+    }
+    if (dec !== undefined) {
+      const cp = parseInt(dec, 10);
+      return cp >= 0 && cp <= 0x10ffff ? String.fromCodePoint(cp) : '�';
+    }
+    return ENTITY_MAP.get(name) ?? _;
+  });
 }
 
 function escapeXml(text: string): string {
@@ -153,9 +150,7 @@ function tokenise(xml: string, warnings?: MarcWarning[]): Token[] {
     if (xml.startsWith('<![CDATA[', ltPos)) {
       const cdataEnd = xml.indexOf(']]>', ltPos + 9);
       if (cdataEnd === -1) {
-        warnings?.push(
-          createWarning('malformed_xml', 'Unterminated CDATA section'),
-        );
+        warnings?.push(createWarning('malformed_xml', 'Unterminated CDATA section'));
         i = xml.length;
       } else {
         // CDATA content is literal — no entity unescaping
@@ -181,9 +176,7 @@ function tokenise(xml: string, warnings?: MarcWarning[]): Token[] {
     // Regular element tag — use quote-aware scanning
     const gtPos = findTagEnd(xml, ltPos + 1);
     if (gtPos === -1) {
-      warnings?.push(
-        createWarning('malformed_xml', 'Unclosed tag at end of input'),
-      );
+      warnings?.push(createWarning('malformed_xml', 'Unclosed tag at end of input'));
       break;
     }
 
@@ -220,11 +213,7 @@ function tokenise(xml: string, warnings?: MarcWarning[]): Token[] {
 
 // ─── MARCXML parser ───────────────────────────────────────────────────────────
 
-function emitWarning(
-  warnings: MarcWarning[],
-  warning: MarcWarning,
-  options: ParseOptions,
-): void {
+function emitWarning(warnings: MarcWarning[], warning: MarcWarning, options: ParseOptions): void {
   if (options.strict) {
     throw new Error(warning.message);
   }
@@ -241,7 +230,7 @@ function parseRecordTokens(
   tokens: Token[],
   start: number,
   warnings: MarcWarning[],
-  options: ParseOptions,
+  options: ParseOptions
 ): { record: MarcRecord; end: number } {
   let leader = '';
   let hasLeader = false;
@@ -256,7 +245,7 @@ function parseRecordTokens(
         emitWarning(
           warnings,
           createWarning('missing_element', 'Record has no <leader> element'),
-          options,
+          options
         );
       }
       return { record: { leader, fields }, end: i + 1 };
@@ -272,11 +261,8 @@ function parseRecordTokens(
       if (leader.length !== 24) {
         emitWarning(
           warnings,
-          createWarning(
-            'invalid_leader',
-            `Leader is ${leader.length} characters, expected 24`,
-          ),
-          options,
+          createWarning('invalid_leader', `Leader is ${leader.length} characters, expected 24`),
+          options
         );
       }
       // consume </leader>
@@ -289,11 +275,8 @@ function parseRecordTokens(
       if (tag === undefined) {
         emitWarning(
           warnings,
-          createWarning(
-            'missing_element',
-            'controlfield missing tag attribute',
-          ),
-          options,
+          createWarning('missing_element', 'controlfield missing tag attribute'),
+          options
         );
       }
       fields.push({ tag: tag ?? '', data: '' });
@@ -306,11 +289,8 @@ function parseRecordTokens(
       if (tag === undefined) {
         emitWarning(
           warnings,
-          createWarning(
-            'missing_element',
-            'controlfield missing tag attribute',
-          ),
-          options,
+          createWarning('missing_element', 'controlfield missing tag attribute'),
+          options
         );
       }
       i++;
@@ -331,7 +311,7 @@ function parseRecordTokens(
         emitWarning(
           warnings,
           createWarning('missing_element', 'datafield missing tag attribute'),
-          options,
+          options
         );
       }
       fields.push({
@@ -350,7 +330,7 @@ function parseRecordTokens(
         emitWarning(
           warnings,
           createWarning('missing_element', 'datafield missing tag attribute'),
-          options,
+          options
         );
       }
       const indicator1 = tok.attrs?.['ind1'] ?? ' ';
@@ -369,13 +349,8 @@ function parseRecordTokens(
           if (code === undefined) {
             emitWarning(
               warnings,
-              createWarning(
-                'missing_element',
-                'subfield missing code attribute',
-                undefined,
-                tag,
-              ),
-              options,
+              createWarning('missing_element', 'subfield missing code attribute', undefined, tag),
+              options
             );
           }
           i++;
@@ -403,7 +378,7 @@ function parseRecordTokens(
     emitWarning(
       warnings,
       createWarning('missing_element', 'Record has no <leader> element'),
-      options,
+      options
     );
   }
   return { record: { leader, fields }, end: i };
@@ -413,10 +388,7 @@ function parseRecordTokens(
  * Parse a MARCXML string, returning per-record parse results including warnings.
  * Unlike parseMarcXml, every record attempt is included even if it produced warnings.
  */
-export function parseMarcXmlWithWarnings(
-  xml: string,
-  options?: ParseOptions,
-): ParseBatchResult {
+export function parseMarcXmlWithWarnings(xml: string, options?: ParseOptions): ParseBatchResult {
   const opts = options ?? {};
   const tokWarnings: MarcWarning[] = [];
   const tokens = tokenise(xml, tokWarnings);
@@ -427,12 +399,7 @@ export function parseMarcXmlWithWarnings(
     const tok = tokens[i]!;
     if (tok.type === 'open' && tok.name === 'record') {
       const recordWarnings: MarcWarning[] = [];
-      const { record, end } = parseRecordTokens(
-        tokens,
-        i + 1,
-        recordWarnings,
-        opts,
-      );
+      const { record, end } = parseRecordTokens(tokens, i + 1, recordWarnings, opts);
       results.push({ record, warnings: recordWarnings });
       i = end;
       continue;
@@ -456,14 +423,9 @@ export function parseMarcXmlWithWarnings(
  * Parse a MARCXML string containing one `<collection>` or one bare `<record>`.
  * Returns all successfully parsed records.
  */
-export function parseMarcXml(
-  xml: string,
-  options?: ParseOptions,
-): MarcRecord[] {
+export function parseMarcXml(xml: string, options?: ParseOptions): MarcRecord[] {
   const batch = parseMarcXmlWithWarnings(xml, options);
-  return batch.results
-    .map((r) => r.record)
-    .filter((r): r is MarcRecord => r !== null);
+  return batch.results.map((r) => r.record).filter((r): r is MarcRecord => r !== null);
 }
 
 // ─── MARCXML serializer ───────────────────────────────────────────────────────
@@ -479,17 +441,17 @@ function serializeMarcXmlRecord(record: MarcRecord): string {
   for (const field of record.fields) {
     if (isControlField(field)) {
       lines.push(
-        `${INDENT}<controlfield tag="${escapeXml(field.tag)}">${escapeXml(field.data)}</controlfield>`,
+        `${INDENT}<controlfield tag="${escapeXml(field.tag)}">${escapeXml(field.data)}</controlfield>`
       );
     } else {
       const ind1 = field.indicator1 === ' ' ? ' ' : field.indicator1;
       const ind2 = field.indicator2 === ' ' ? ' ' : field.indicator2;
       lines.push(
-        `${INDENT}<datafield tag="${escapeXml(field.tag)}" ind1="${escapeXml(ind1)}" ind2="${escapeXml(ind2)}">`,
+        `${INDENT}<datafield tag="${escapeXml(field.tag)}" ind1="${escapeXml(ind1)}" ind2="${escapeXml(ind2)}">`
       );
       for (const sf of field.subfields) {
         lines.push(
-          `${INDENT}${INDENT}<subfield code="${escapeXml(sf.code)}">${escapeXml(sf.value)}</subfield>`,
+          `${INDENT}${INDENT}<subfield code="${escapeXml(sf.code)}">${escapeXml(sf.value)}</subfield>`
         );
       }
       lines.push(`${INDENT}</datafield>`);
