@@ -240,9 +240,9 @@ describe('serializeMarcBinaryWithWarnings', () => {
   });
 
   it('respects maxWarnings in MARC-8 encoding', () => {
-    let callCount = 0;
+    let _callCount = 0;
     vi.spyOn(marc8Module, 'unicodeToMarc8WithStats').mockImplementation(() => {
-      callCount++;
+      _callCount++;
       return { bytes: new Uint8Array([0x3f]), lossyCount: 1 };
     });
 
