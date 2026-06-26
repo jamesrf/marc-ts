@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseMarcXml, serializeMarcXml } from '../marcxml';
+import { parseMarcXml, parseMarcXmlWithWarnings, serializeMarcXml } from '../marcxml';
 import type { MarcRecord } from '../types';
 
 const SAMPLE_RECORD: MarcRecord = {
@@ -255,5 +255,301 @@ describe('unescapeXml numeric entity handling', () => {
     expect(() => parseMarcXml(xml)).not.toThrow();
     const records = parseMarcXml(xml);
     expect(records[0]!.fields[0]).toMatchObject({ tag: '001', data: '�' });
+  });
+});
+
+describe('serializer attribute escaping', () => {
+  it('escapes special characters in controlfield tag attribute', () => {
+    const rec: MarcRecord = {
+      leader: '00000nam a2200000   4500',
+      fields: [{ tag: '0"1', data: 'test' }],
+    };
+    const xml = serializeMarcXml([rec]);
+    expect(xml).toContain('tag="0&quot;1"');
+    expect(xml).not.toContain('tag="0"1"');
+  });
+
+  it('escapes special characters in datafield tag attribute', () => {
+    const rec: MarcRecord = {
+      leader: '00000nam a2200000   4500',
+      fields: [
+        {
+          tag: '2&5',
+          indicator1: '1',
+          indicator2: '0',
+          subfields: [{ code: 'a', value: 'test' }],
+        },
+      ],
+    };
+    const xml = serializeMarcXml([rec]);
+    expect(xml).toContain('tag="2&amp;5"');
+  });
+
+  it('escapes special characters in indicator attributes', () => {
+    const rec: MarcRecord = {
+      leader: '00000nam a2200000   4500',
+      fields: [
+        {
+          tag: '245',
+          indicator1: '"',
+          indicator2: '<',
+          subfields: [{ code: 'a', value: 'test' }],
+        },
+      ],
+    };
+    const xml = serializeMarcXml([rec]);
+    expect(xml).toContain('ind1="&quot;"');
+    expect(xml).toContain('ind2="&lt;"');
+  });
+
+  it('escapes special characters in subfield code attribute', () => {
+    const rec: MarcRecord = {
+      leader: '00000nam a2200000   4500',
+      fields: [
+        {
+          tag: '245',
+          indicator1: '1',
+          indicator2: '0',
+          subfields: [{ code: '&', value: 'test' }],
+        },
+      ],
+    };
+    const xml = serializeMarcXml([rec]);
+    expect(xml).toContain('code="&amp;"');
+  });
+
+  it('round-trips attribute values with special characters', () => {
+    const rec: MarcRecord = {
+      leader: '00000nam a2200000   4500',
+      fields: [
+        {
+          tag: '2"5',
+          indicator1: '&',
+          indicator2: '<',
+          subfields: [{ code: '>', value: 'test' }],
+        },
+      ],
+    };
+    const xml = serializeMarcXml([rec]);
+    const parsed = parseMarcXml(xml);
+    expect(parsed).toHaveLength(1);
+    const df = parsed[0]!.fields[0]! as {
+      tag: string;
+      indicator1: string;
+      indicator2: string;
+      subfields: { code: string; value: string }[];
+    };
+    expect(df.tag).toBe('2"5');
+    expect(df.indicator1).toBe('&');
+    expect(df.indicator2).toBe('<');
+    expect(df.subfields[0]!.code).toBe('>');
+  });
+});
+
+describe('tokeniser robustness', () => {
+  it('handles > inside a double-quoted attribute value', () => {
+    const xml = `<record>
+      <leader>00000nam a2200000   4500</leader>
+      <datafield tag="245" ind1="&gt;" ind2="0">
+        <subfield code="a">test</subfield>
+      </datafield>
+    </record>`;
+    const records = parseMarcXml(xml);
+    expect(records).toHaveLength(1);
+    const df = records[0]!.fields[0]! as { indicator1: string };
+    expect(df.indicator1).toBe('>');
+  });
+
+  it('handles a comment with embedded >', () => {
+    const xml = `<!-- x > y -->
+    <record>
+      <leader>00000nam a2200000   4500</leader>
+      <controlfield tag="001">after-comment</controlfield>
+    </record>`;
+    const records = parseMarcXml(xml);
+    expect(records).toHaveLength(1);
+    expect((records[0]!.fields[0]! as { data: string }).data).toBe('after-comment');
+  });
+
+  it('handles CDATA in controlfield data', () => {
+    const xml = `<record>
+      <leader>00000nam a2200000   4500</leader>
+      <controlfield tag="001"><![CDATA[raw & value]]></controlfield>
+    </record>`;
+    const records = parseMarcXml(xml);
+    expect(records).toHaveLength(1);
+    expect((records[0]!.fields[0]! as { data: string }).data).toBe('raw & value');
+  });
+
+  it('handles CDATA in subfield value', () => {
+    const xml = `<record>
+      <leader>00000nam a2200000   4500</leader>
+      <datafield tag="245" ind1="1" ind2="0">
+        <subfield code="a"><![CDATA[text & <more>]]></subfield>
+      </datafield>
+    </record>`;
+    const records = parseMarcXml(xml);
+    const df = records[0]!.fields[0]! as {
+      subfields: { value: string }[];
+    };
+    expect(df.subfields[0]!.value).toBe('text & <more>');
+  });
+
+  it('handles a processing instruction before records', () => {
+    const xml = `<?xml version="1.0"?><?xml-stylesheet type="text/xsl" href="style.xsl"?>
+    <record>
+      <leader>00000nam a2200000   4500</leader>
+      <controlfield tag="001">after-pi</controlfield>
+    </record>`;
+    const records = parseMarcXml(xml);
+    expect(records).toHaveLength(1);
+    expect((records[0]!.fields[0]! as { data: string }).data).toBe('after-pi');
+  });
+
+  it('handles a DOCTYPE declaration', () => {
+    const xml = `<!DOCTYPE collection SYSTEM "marc.dtd">
+    <record>
+      <leader>00000nam a2200000   4500</leader>
+      <controlfield tag="001">after-doctype</controlfield>
+    </record>`;
+    const records = parseMarcXml(xml);
+    expect(records).toHaveLength(1);
+    expect((records[0]!.fields[0]! as { data: string }).data).toBe('after-doctype');
+  });
+
+  it('does not crash on unterminated comment', () => {
+    const xml = '<!-- never closed';
+    expect(() => parseMarcXml(xml)).not.toThrow();
+    expect(parseMarcXml(xml)).toHaveLength(0);
+  });
+
+  it('does not crash on unclosed tag at EOF', () => {
+    const xml = '<record><leader>00000nam a2200000   4500</leader><controlfield tag="001"';
+    expect(() => parseMarcXml(xml)).not.toThrow();
+  });
+});
+
+describe('parseMarcXmlWithWarnings', () => {
+  it('returns per-record results for valid input', () => {
+    const collectionXml = `<collection>
+      <record>
+        <leader>00000nam a2200000   4500</leader>
+        <controlfield tag="001">A</controlfield>
+      </record>
+      <record>
+        <leader>00000nam a2200000   4500</leader>
+        <controlfield tag="001">B</controlfield>
+      </record>
+    </collection>`;
+    const batch = parseMarcXmlWithWarnings(collectionXml);
+    expect(batch.results).toHaveLength(2);
+    expect(batch.results[0]!.record).not.toBeNull();
+    expect(batch.results[0]!.warnings).toHaveLength(0);
+    expect(batch.results[1]!.record).not.toBeNull();
+    expect(batch.results[1]!.warnings).toHaveLength(0);
+  });
+
+  it('returns same records as parseMarcXml for valid input', () => {
+    const xml = serializeMarcXml([SAMPLE_RECORD]);
+    const plain = parseMarcXml(xml);
+    const batch = parseMarcXmlWithWarnings(xml);
+    const withWarnings = batch.results.map((r) => r.record);
+    expect(withWarnings).toEqual(plain);
+  });
+
+  it('warns on missing leader', () => {
+    const xml = `<record>
+      <controlfield tag="001">no-leader</controlfield>
+    </record>`;
+    const batch = parseMarcXmlWithWarnings(xml);
+    expect(batch.results).toHaveLength(1);
+    expect(batch.results[0]!.record).not.toBeNull();
+    expect(batch.results[0]!.warnings.some((w) => w.type === 'missing_element')).toBe(true);
+  });
+
+  it('warns on invalid leader length', () => {
+    const xml = `<record>
+      <leader>short</leader>
+      <controlfield tag="001">data</controlfield>
+    </record>`;
+    const batch = parseMarcXmlWithWarnings(xml);
+    expect(batch.results[0]!.warnings.some((w) => w.type === 'invalid_leader')).toBe(true);
+  });
+
+  it('warns on missing tag attribute in controlfield', () => {
+    const xml = `<record>
+      <leader>00000nam a2200000   4500</leader>
+      <controlfield>no-tag-attr</controlfield>
+    </record>`;
+    const batch = parseMarcXmlWithWarnings(xml);
+    expect(batch.results[0]!.warnings.some((w) => w.type === 'missing_element')).toBe(true);
+    expect(batch.results[0]!.warnings.some((w) => w.message.includes('controlfield'))).toBe(true);
+  });
+
+  it('warns on missing tag attribute in datafield', () => {
+    const xml = `<record>
+      <leader>00000nam a2200000   4500</leader>
+      <datafield ind1="1" ind2="0">
+        <subfield code="a">test</subfield>
+      </datafield>
+    </record>`;
+    const batch = parseMarcXmlWithWarnings(xml);
+    expect(batch.results[0]!.warnings.some((w) => w.message.includes('datafield'))).toBe(true);
+  });
+
+  it('warns on missing code attribute in subfield', () => {
+    const xml = `<record>
+      <leader>00000nam a2200000   4500</leader>
+      <datafield tag="245" ind1="1" ind2="0">
+        <subfield>no code</subfield>
+      </datafield>
+    </record>`;
+    const batch = parseMarcXmlWithWarnings(xml);
+    expect(batch.results[0]!.warnings.some((w) => w.message.includes('subfield'))).toBe(true);
+  });
+
+  it('warns on unterminated comment', () => {
+    const xml = '<!-- never closed <record><leader>00000nam a2200000   4500</leader></record>';
+    const batch = parseMarcXmlWithWarnings(xml);
+    const allWarnings = batch.results.flatMap((r) => r.warnings);
+    expect(allWarnings.some((w) => w.type === 'malformed_xml')).toBe(true);
+  });
+
+  it('warns on unclosed tag at EOF', () => {
+    const xml = '<record><leader>00000nam a2200000   4500</leader><controlfield tag="001"';
+    const batch = parseMarcXmlWithWarnings(xml);
+    const allWarnings = batch.results.flatMap((r) => r.warnings);
+    expect(allWarnings.some((w) => w.type === 'malformed_xml')).toBe(true);
+  });
+
+  it('throws in strict mode on first warning', () => {
+    const xml = `<record>
+      <controlfield tag="001">no-leader</controlfield>
+    </record>`;
+    expect(() => parseMarcXmlWithWarnings(xml, { strict: true })).toThrow();
+  });
+
+  it('throws in strict mode via parseMarcXml', () => {
+    const xml = `<record>
+      <leader>short</leader>
+    </record>`;
+    expect(() => parseMarcXml(xml, { strict: true })).toThrow();
+  });
+
+  it('respects maxWarnings limit', () => {
+    const xml = `<record>
+      <controlfield>a</controlfield>
+      <controlfield>b</controlfield>
+      <controlfield>c</controlfield>
+      <controlfield>d</controlfield>
+      <controlfield>e</controlfield>
+    </record>`;
+    const batch = parseMarcXmlWithWarnings(xml, { maxWarnings: 2 });
+    expect(batch.results[0]!.warnings.length).toBeLessThanOrEqual(2);
+  });
+
+  it('returns empty results for empty input', () => {
+    const batch = parseMarcXmlWithWarnings('');
+    expect(batch.results).toHaveLength(0);
   });
 });
