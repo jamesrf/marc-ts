@@ -205,9 +205,7 @@ describe('marc8ToUnicode', () => {
 
   it('designates EACC to G1 via ESC $ ) and decodes G1 EACC bytes', () => {
     // ESC $ ) 1 designates EACC to G1; G1 bytes 0xA1 0xA1 0xC1 normalize to 0x21 0x21 0x41 → 中
-    expect(
-      marc8ToUnicode(new Uint8Array([ESC, 0x24, 0x29, 0x31, 0xa1, 0xa1, 0xc1]))
-    ).toBe('中');
+    expect(marc8ToUnicode(new Uint8Array([ESC, 0x24, 0x29, 0x31, 0xa1, 0xa1, 0xc1]))).toBe('中');
   });
 
   it('emits replacement for ESC $ when no byte follows', () => {
@@ -340,8 +338,12 @@ describe('EACC coverage (documented limitation)', () => {
     // 0x21 0x70 0x70 is well past the mapped range (0x21 0x21 0x21..0x42).
     // Build a MARC-8 stream that switches to EACC then emits one triple.
     const bytes = new Uint8Array([
-      ESC, 0x24, 0x31, // designate G0 = EACC (multi-byte)
-      0x70, 0x70, 0x70, // unmapped triple
+      ESC,
+      0x24,
+      0x31, // designate G0 = EACC (multi-byte)
+      0x70,
+      0x70,
+      0x70, // unmapped triple
     ]);
     const decoded = marc8ToUnicode(bytes);
     expect(decoded).toContain('�');
@@ -470,7 +472,10 @@ describe('MARC8 parser integration', () => {
       encodeAscii(' Hebrew '),
       new Uint8Array([ESC, 0x28, 0x32, 0x60, 0x61])
     );
-    const buffer = buildMarc8Record([{ tag: '001', data: 'mixed001' }, { tag: '245', rawBytes: titleField }]);
+    const buffer = buildMarc8Record([
+      { tag: '001', data: 'mixed001' },
+      { tag: '245', rawBytes: titleField },
+    ]);
 
     const records = parseMarcBinary(buffer);
 

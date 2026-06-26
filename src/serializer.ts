@@ -3,7 +3,14 @@
  * Converts MarcRecord objects back to binary format.
  */
 
-import type { MarcRecord, ControlField, DataField, MarcWarning, SerializeRecordResult, SerializeBatchResult } from './types';
+import type {
+  MarcRecord,
+  ControlField,
+  DataField,
+  MarcWarning,
+  SerializeRecordResult,
+  SerializeBatchResult,
+} from './types';
 import { isControlField } from './types';
 import { unicodeToMarc8WithStats } from './marc8';
 import { createWarning } from './warnings';
@@ -39,10 +46,7 @@ const TAG_LENGTH = 3;
 const FIELD_LENGTH_SIZE = 4;
 const STARTING_POSITION_SIZE = 5;
 
-function serializeMarcRecord(
-  record: MarcRecord,
-  options: SerializeOptions = {}
-): Uint8Array {
+function serializeMarcRecord(record: MarcRecord, options: SerializeOptions = {}): Uint8Array {
   return serializeMarcRecordWithWarnings(record, options).bytes;
 }
 
@@ -268,7 +272,10 @@ function buildLeader(
  * @param options - Encoding options forwarded to the per-record serializer
  * @returns Concatenated binary representation of all records
  */
-export function serializeMarcBinary(records: MarcRecord[], options: SerializeOptions = {}): Uint8Array {
+export function serializeMarcBinary(
+  records: MarcRecord[],
+  options: SerializeOptions = {}
+): Uint8Array {
   const parts = records.map((r) => serializeMarcRecord(r, options));
   const totalLength = parts.reduce((n, p) => n + p.length, 0);
   const out = new Uint8Array(totalLength);

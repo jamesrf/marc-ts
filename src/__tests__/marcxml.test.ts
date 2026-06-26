@@ -1,8 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  parseMarcXml,
-  serializeMarcXml,
-} from '../marcxml';
+import { parseMarcXml, serializeMarcXml } from '../marcxml';
 import type { MarcRecord } from '../types';
 
 const SAMPLE_RECORD: MarcRecord = {
@@ -59,7 +56,12 @@ describe('parseMarcXml', () => {
 
   it('parses data field indicators and subfields correctly', () => {
     const [rec] = parseMarcXml(SAMPLE_XML);
-    const df = rec!.fields[2]! as { tag: string; indicator1: string; indicator2: string; subfields: { code: string; value: string }[] };
+    const df = rec!.fields[2]! as {
+      tag: string;
+      indicator1: string;
+      indicator2: string;
+      subfields: { code: string; value: string }[];
+    };
     expect(df.tag).toBe('245');
     expect(df.indicator1).toBe('1');
     expect(df.indicator2).toBe('4');
@@ -126,7 +128,6 @@ describe('parseMarcXml', () => {
     expect(parseMarcXml('')).toHaveLength(0);
   });
 });
-
 
 describe('serializeMarcXml', () => {
   it('wraps records in a <collection> element', () => {

@@ -97,7 +97,9 @@ describe('serializeMarcBinary', () => {
         leader: '00000nam  2200000   4500',
         fields: [{ ...baseDataField, subfields: [{ code: '', value: 'x' }] }],
       };
-      expect(() => serializeMarcBinary([record])).toThrow(/subfield code must be exactly 1 character/);
+      expect(() => serializeMarcBinary([record])).toThrow(
+        /subfield code must be exactly 1 character/
+      );
     });
 
     it('throws on a multi-character subfield code', () => {
@@ -105,13 +107,17 @@ describe('serializeMarcBinary', () => {
         leader: '00000nam  2200000   4500',
         fields: [{ ...baseDataField, subfields: [{ code: 'ab', value: 'x' }] }],
       };
-      expect(() => serializeMarcBinary([record])).toThrow(/subfield code must be exactly 1 character/);
+      expect(() => serializeMarcBinary([record])).toThrow(
+        /subfield code must be exactly 1 character/
+      );
     });
 
     it('throws on an empty indicator', () => {
       const record: MarcRecord = {
         leader: '00000nam  2200000   4500',
-        fields: [{ tag: '245', indicator1: '', indicator2: '0', subfields: [{ code: 'a', value: 'x' }] }],
+        fields: [
+          { tag: '245', indicator1: '', indicator2: '0', subfields: [{ code: 'a', value: 'x' }] },
+        ],
       };
       expect(() => serializeMarcBinary([record])).toThrow(/indicator1 must be exactly 1 character/);
     });
@@ -129,7 +135,9 @@ describe('serializeMarcBinary', () => {
         leader: '00000nam  2200000   4500',
         fields: [{ ...baseDataField, indicator1: '​', subfields: [] }],
       };
-      expect(() => serializeMarcBinary([record])).toThrow(/indicator1 must be an ASCII printable character/);
+      expect(() => serializeMarcBinary([record])).toThrow(
+        /indicator1 must be an ASCII printable character/
+      );
     });
 
     it('throws when indicator2 is a non-ASCII BMP character (fullwidth digit)', () => {
@@ -137,7 +145,9 @@ describe('serializeMarcBinary', () => {
         leader: '00000nam  2200000   4500',
         fields: [{ ...baseDataField, indicator2: '１', subfields: [] }],
       };
-      expect(() => serializeMarcBinary([record])).toThrow(/indicator2 must be an ASCII printable character/);
+      expect(() => serializeMarcBinary([record])).toThrow(
+        /indicator2 must be an ASCII printable character/
+      );
     });
 
     it('throws when a subfield code is a non-ASCII BMP character', () => {
@@ -145,7 +155,9 @@ describe('serializeMarcBinary', () => {
         leader: '00000nam  2200000   4500',
         fields: [{ ...baseDataField, subfields: [{ code: 'é', value: 'x' }] }],
       };
-      expect(() => serializeMarcBinary([record])).toThrow(/subfield code must be an ASCII printable character/);
+      expect(() => serializeMarcBinary([record])).toThrow(
+        /subfield code must be an ASCII printable character/
+      );
     });
   });
 });

@@ -147,9 +147,24 @@ describe('parseMarcBinary', () => {
       leader: '00000nam  2200000   4500',
       fields: [
         { tag: '001', data: 'test001' },
-        { tag: '650', indicator1: ' ', indicator2: '0', subfields: [{ code: 'a', value: 'Subject 1' }] },
-        { tag: '650', indicator1: ' ', indicator2: '0', subfields: [{ code: 'a', value: 'Subject 2' }] },
-        { tag: '650', indicator1: ' ', indicator2: '0', subfields: [{ code: 'a', value: 'Subject 3' }] },
+        {
+          tag: '650',
+          indicator1: ' ',
+          indicator2: '0',
+          subfields: [{ code: 'a', value: 'Subject 1' }],
+        },
+        {
+          tag: '650',
+          indicator1: ' ',
+          indicator2: '0',
+          subfields: [{ code: 'a', value: 'Subject 2' }],
+        },
+        {
+          tag: '650',
+          indicator1: ' ',
+          indicator2: '0',
+          subfields: [{ code: 'a', value: 'Subject 3' }],
+        },
       ],
     };
 
@@ -284,7 +299,9 @@ describe('parseMarcBinary', () => {
         ],
       });
 
-      expect(() => parseMarcBinary(buf, { strict: true })).toThrow('Failed to decode subfield 245$a');
+      expect(() => parseMarcBinary(buf, { strict: true })).toThrow(
+        'Failed to decode subfield 245$a'
+      );
     });
 
     it('halts subfield parsing when maxWarnings is reached mid-subfield-loop', () => {
@@ -344,7 +361,9 @@ describe('parseMarcBinary', () => {
       buf.set(leaderBytes, 0);
       for (let i = leaderBytes.length; i < buf.length - 1; i++) buf[i] = 0x41; // 'A'
       buf[buf.length - 1] = 0x1d;
-      expect(() => parseMarcBinary(buf, { strict: true })).toThrow('Directory terminator not found');
+      expect(() => parseMarcBinary(buf, { strict: true })).toThrow(
+        'Directory terminator not found'
+      );
     });
 
     it('throws in strict mode when no directory entries found', () => {
@@ -366,7 +385,7 @@ describe('parseMarcBinary', () => {
       };
       const buf = serializeMarcBinary([record]);
       buf[9] = 0x62; // 'b' — invalid encoding flag
-      expect(() => parseMarcBinary(buf, { strict: true })).toThrow("Leader position 9");
+      expect(() => parseMarcBinary(buf, { strict: true })).toThrow('Leader position 9');
     });
 
     it('throws in strict mode when buffer is longer than declared record length', () => {
@@ -439,9 +458,7 @@ describe('parseMarcBinary', () => {
       const baseStr = (24 + dirStr.length + 1).toString().padStart(5, '0');
       const leaderStr = `${lenStr}nam  22${baseStr}   4500`;
       const buffer = buildMalformedRecord(leaderStr, dirStr, fieldData);
-      expect(() => parseMarcBinary(buffer, { strict: true })).toThrow(
-        'too short for indicators'
-      );
+      expect(() => parseMarcBinary(buffer, { strict: true })).toThrow('too short for indicators');
     });
 
     it('throws in strict mode when subfield delimiter is missing', () => {
@@ -465,9 +482,7 @@ describe('parseMarcBinary', () => {
           break;
         }
       }
-      expect(() => parseMarcBinary(buf, { strict: true })).toThrow(
-        'Expected subfield delimiter'
-      );
+      expect(() => parseMarcBinary(buf, { strict: true })).toThrow('Expected subfield delimiter');
     });
   });
 

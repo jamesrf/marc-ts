@@ -33,7 +33,7 @@ export interface MarcJsonDataFieldValue {
 }
 
 export type MarcJsonField =
-  | { [tag: string]: string }                 // control field
+  | { [tag: string]: string } // control field
   | { [tag: string]: MarcJsonDataFieldValue }; // data field
 
 export interface MarcJsonObject {
@@ -60,7 +60,9 @@ function parseMarcJsonObject(obj: MarcJsonObject): MarcRecord {
 
     const keys = Object.keys(entry);
     if (keys.length !== 1) {
-      throw new Error(`MARC-in-JSON: field entry must have exactly one key, got ${keys.join(', ')}`);
+      throw new Error(
+        `MARC-in-JSON: field entry must have exactly one key, got ${keys.join(', ')}`
+      );
     }
 
     const tag = keys[0]!;
@@ -89,9 +91,7 @@ function parseMarcJsonObject(obj: MarcJsonObject): MarcRecord {
         const code = sfKeys[0]!;
         const sfValue = sfEntry[code];
         if (typeof sfValue !== 'string') {
-          throw new Error(
-            `MARC-in-JSON: subfield value for "${tag}$${code}" must be a string`
-          );
+          throw new Error(`MARC-in-JSON: subfield value for "${tag}$${code}" must be a string`);
         }
         return { code, value: sfValue };
       });

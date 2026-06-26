@@ -37,18 +37,20 @@ function unescapeXml(text: string): string {
 }
 
 function escapeXml(text: string): string {
-  return text
-    // XML 1.0 forbids most C0 control characters in document text. There is no
-    // valid XML 1.0 representation for them, so substitute the Unicode
-    // replacement character to keep the output well-formed.
-    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '�')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    // Preserve literal CR through the XML round-trip: XML parsers normalize
-    // bare \r and \r\n to \n, so we must encode CR as a numeric reference.
-    .replace(/\r/g, '&#13;');
+  return (
+    text
+      // XML 1.0 forbids most C0 control characters in document text. There is no
+      // valid XML 1.0 representation for them, so substitute the Unicode
+      // replacement character to keep the output well-formed.
+      .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '�')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      // Preserve literal CR through the XML round-trip: XML parsers normalize
+      // bare \r and \r\n to \n, so we must encode CR as a numeric reference.
+      .replace(/\r/g, '&#13;')
+  );
 }
 
 // ─── Minimal tokeniser ────────────────────────────────────────────────────────
@@ -274,14 +276,18 @@ function serializeMarcXmlRecord(record: MarcRecord): string {
 
   for (const field of record.fields) {
     if (isControlField(field)) {
-      lines.push(`${INDENT}<controlfield tag="${field.tag}">${escapeXml(field.data)}</controlfield>`);
+      lines.push(
+        `${INDENT}<controlfield tag="${escapeXml(field.tag)}">${escapeXml(field.data)}</controlfield>`
+      );
     } else {
       const ind1 = field.indicator1 === ' ' ? ' ' : field.indicator1;
       const ind2 = field.indicator2 === ' ' ? ' ' : field.indicator2;
-      lines.push(`${INDENT}<datafield tag="${field.tag}" ind1="${ind1}" ind2="${ind2}">`);
+      lines.push(
+        `${INDENT}<datafield tag="${escapeXml(field.tag)}" ind1="${escapeXml(ind1)}" ind2="${escapeXml(ind2)}">`
+      );
       for (const sf of field.subfields) {
         lines.push(
-          `${INDENT}${INDENT}<subfield code="${sf.code}">${escapeXml(sf.value)}</subfield>`
+          `${INDENT}${INDENT}<subfield code="${escapeXml(sf.code)}">${escapeXml(sf.value)}</subfield>`
         );
       }
       lines.push(`${INDENT}</datafield>`);
@@ -296,10 +302,7 @@ function serializeMarcXmlRecord(record: MarcRecord): string {
  * Serialize one or more MarcRecords into a MARCXML `<collection>` document.
  */
 export function serializeMarcXml(records: MarcRecord[]): string {
-  const parts: string[] = [
-    XML_HEADER,
-    `<collection ${COLLECTION_NS}>`,
-  ];
+  const parts: string[] = [XML_HEADER, `<collection ${COLLECTION_NS}>`];
 
   for (const record of records) {
     // Indent each record element by one level inside <collection>

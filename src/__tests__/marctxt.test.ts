@@ -1,8 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  parseMarcTxt,
-  serializeMarcTxt,
-} from '../marctxt';
+import { parseMarcTxt, serializeMarcTxt } from '../marctxt';
 import { recordsEqual } from '../clone';
 import type { MarcRecord } from '../types';
 
@@ -54,7 +51,12 @@ describe('parseMarcTxt', () => {
 
   it('parses data field indicators and subfields', () => {
     const [rec] = parseMarcTxt(SAMPLE_TXT);
-    const df = rec!.fields[2] as { tag: string; indicator1: string; indicator2: string; subfields: { code: string; value: string }[] };
+    const df = rec!.fields[2] as {
+      tag: string;
+      indicator1: string;
+      indicator2: string;
+      subfields: { code: string; value: string }[];
+    };
     expect(df.tag).toBe('245');
     expect(df.indicator1).toBe('1');
     expect(df.indicator2).toBe('4');
@@ -98,18 +100,13 @@ describe('parseMarcTxt', () => {
 
 describe('=000 leader (LC spec form)', () => {
   it('parses =000 as the leader, not as a control field', () => {
-    const txt = [
-      '=000  00000nam a2200000 a 4500',
-      '=001  12345',
-      '',
-    ].join('\n');
+    const txt = ['=000  00000nam a2200000 a 4500', '=001  12345', ''].join('\n');
     const [rec] = parseMarcTxt(txt);
     expect(rec!.leader).toBe('00000nam a2200000 a 4500');
     expect(rec!.fields).toHaveLength(1);
     expect(rec!.fields[0]).toMatchObject({ tag: '001', data: '12345' });
   });
 });
-
 
 describe('serializeMarcTxt', () => {
   it('produces a =LDR line', () => {

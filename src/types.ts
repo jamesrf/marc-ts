@@ -88,7 +88,10 @@ export type MarcWarningType =
   | 'invalid_directory'
   | 'invalid_field'
   | 'truncated_record'
-  | 'encoding_error';
+  | 'encoding_error'
+  | 'malformed_xml'
+  | 'missing_element'
+  | 'invalid_attribute';
 
 /**
  * A warning generated during MARC record parsing.

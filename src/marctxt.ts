@@ -151,9 +151,7 @@ function serializeMarcTxtRecord(record: MarcRecord): string {
     } else {
       const ind1 = encodeIndicator(field.indicator1);
       const ind2 = encodeIndicator(field.indicator2);
-      const subfields = field.subfields
-        .map((sf) => `$${sf.code}${escapeValue(sf.value)}`)
-        .join('');
+      const subfields = field.subfields.map((sf) => `$${sf.code}${escapeValue(sf.value)}`).join('');
       lines.push(`=${field.tag}  ${ind1}${ind2}${subfields}`);
     }
   }

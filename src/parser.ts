@@ -152,7 +152,15 @@ function parseMarcRecord(buffer: Uint8Array, options: ParseOptions = {}): ParseR
     : (b) => UTF8_DECODER.decode(b);
 
   // Parse fields using directory entries
-  const fields = parseFields(buffer, directoryEntries, baseAddress, decodeBytes, warnings, strict, maxWarnings);
+  const fields = parseFields(
+    buffer,
+    directoryEntries,
+    baseAddress,
+    decodeBytes,
+    warnings,
+    strict,
+    maxWarnings
+  );
 
   return {
     record: { leader, fields },
