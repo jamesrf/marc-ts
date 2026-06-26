@@ -1,6 +1,6 @@
 {
   "name": "marc-ts",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "TypeScript MARC21 library for Node.js and browsers",
   "type": "module",
   "main": "./dist/index.cjs",
