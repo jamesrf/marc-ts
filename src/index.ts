@@ -51,6 +51,10 @@ export { getField, getFields, getSubfield, getSubfields, getAllSubfields } from 
 // Wildcard querying
 export { getFieldsByPattern, getFirstFieldByPattern } from './query';
 
+// MARCspec querying
+export { getBySpec, getValuesBySpec, parseMarcSpec, MarcSpecParseError } from './marcspec';
+export type { MarcSpecAst, MarcSpecMatch } from './marcspec';
+
 // Field operations (immutable)
 export {
   appendField,

@@ -52,10 +52,10 @@ import { parseMarcBinary, serializeMarcBinary } from 'marc-ts';
 
 Splits on `0x1D` record terminators and parses each record. Failed records are skipped in lenient mode; `strict: true` throws on the first error.
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `strict` | `boolean` | `false` | Throw on fatal parse errors instead of skipping |
-| `maxWarnings` | `number` | `100` | Stop collecting warnings after this many (per record) |
+| Option        | Type      | Default | Description                                           |
+| ------------- | --------- | ------- | ----------------------------------------------------- |
+| `strict`      | `boolean` | `false` | Throw on fatal parse errors instead of skipping       |
+| `maxWarnings` | `number`  | `100`   | Stop collecting warnings after this many (per record) |
 
 Leader byte 9 controls character decoding: `'a'` = UTF-8, `' '` = MARC-8. MARC-8 handles ANSEL Latin, Greek, Hebrew, Cyrillic, Arabic, and sub/superscript scripts. EACC/CJK coverage is minimal (~33 of ~16k triples) — prefer UTF-8 sources for CJK catalogs.
 
@@ -65,10 +65,10 @@ Same as `parseMarcBinary`, but returns per-record results with warnings. Failed 
 
 #### `serializeMarcBinary(records, options?): Uint8Array`
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `encoding` | `'utf8' \| 'marc8'` | `'utf8'` | Character encoding; `'marc8'` replaces unsupported Unicode with `?` |
-| `maxWarnings` | `number` | `100` | Stop collecting warnings after this many (per record) |
+| Option        | Type                | Default  | Description                                                         |
+| ------------- | ------------------- | -------- | ------------------------------------------------------------------- |
+| `encoding`    | `'utf8' \| 'marc8'` | `'utf8'` | Character encoding; `'marc8'` replaces unsupported Unicode with `?` |
+| `maxWarnings` | `number`            | `100`    | Stop collecting warnings after this many (per record)               |
 
 #### `serializeMarcBinaryWithWarnings(records, options?): SerializeBatchResult`
 
@@ -129,23 +129,34 @@ Reserved characters are escaped: `$` → `{dollar}`, `{` → `{lcub}`, `}` → `
 ## Convenience Accessors
 
 ```typescript
-import { title, titleProper, author, edition, publisher, publicationDate,
-         isbn, issn, lccn, subjects, seriesStatement } from 'marc-ts';
+import {
+  title,
+  titleProper,
+  author,
+  edition,
+  publisher,
+  publicationDate,
+  isbn,
+  issn,
+  lccn,
+  subjects,
+  seriesStatement,
+} from 'marc-ts';
 ```
 
-| Function | Source field | Returns |
-|----------|-------------|---------|
-| `title(record)` | 245 $a$b | Full title with subtitle |
-| `titleProper(record)` | 245 $a | Main title only |
-| `author(record)` | 100/110 $a | Main author/creator |
-| `edition(record)` | 250 $a | Edition statement |
-| `publisher(record)` | 260/264 $b | Publisher name |
-| `publicationDate(record)` | 260/264 $c | Publication date |
-| `isbn(record)` | 020 $a | `string[]` of ISBNs |
-| `issn(record)` | 022 $a | ISSN |
-| `lccn(record)` | 010 $a | Library of Congress Control Number |
-| `subjects(record)` | 6XX $a | `string[]` of subject headings |
-| `seriesStatement(record)` | 490 $a | Series statement |
+| Function                  | Source field | Returns                            |
+| ------------------------- | ------------ | ---------------------------------- |
+| `title(record)`           | 245 $a$b     | Full title with subtitle           |
+| `titleProper(record)`     | 245 $a       | Main title only                    |
+| `author(record)`          | 100/110 $a   | Main author/creator                |
+| `edition(record)`         | 250 $a       | Edition statement                  |
+| `publisher(record)`       | 260/264 $b   | Publisher name                     |
+| `publicationDate(record)` | 260/264 $c   | Publication date                   |
+| `isbn(record)`            | 020 $a       | `string[]` of ISBNs                |
+| `issn(record)`            | 022 $a       | ISSN                               |
+| `lccn(record)`            | 010 $a       | Library of Congress Control Number |
+| `subjects(record)`        | 6XX $a       | `string[]` of subject headings     |
+| `seriesStatement(record)` | 490 $a       | Series statement                   |
 
 ---
 
@@ -157,13 +168,13 @@ import { isControlField, isDataField } from 'marc-ts';
 ```
 
 ```typescript
-const field = getField(record, '245');        // first match or undefined
-const fields = getFields(record, '650');      // all matches
+const field = getField(record, '245'); // first match or undefined
+const fields = getFields(record, '650'); // all matches
 
 if (field && isDataField(field)) {
   const a = getSubfield(field, 'a');
   const xs = getSubfields(field, 'x');
-  const all = getAllSubfields(field);         // [{ code, value }, ...]
+  const all = getAllSubfields(field); // [{ code, value }, ...]
 }
 ```
 
@@ -172,10 +183,33 @@ if (field && isDataField(field)) {
 ```typescript
 import { getFieldsByPattern, getFirstFieldByPattern } from 'marc-ts';
 
-const subjects = getFieldsByPattern(record, '6..');   // all 6XX fields
+const subjects = getFieldsByPattern(record, '6..'); // all 6XX fields
 ```
 
 `.` and `X` each match any single digit.
+
+---
+
+## MARCspec Querying
+
+```typescript
+import { getBySpec, getValuesBySpec, parseMarcSpec } from 'marc-ts';
+
+getValuesBySpec(record, '245$a'); // ['The Catcher in the Rye /']
+getValuesBySpec(record, '650$a-c'); // subfield range
+getValuesBySpec(record, '300[0]$a'); // first occurrence (0-indexed)
+getValuesBySpec(record, '300[#]$a'); // last occurrence
+getValuesBySpec(record, '245$a/0-2'); // character range -> 'The'
+getValuesBySpec(record, '880^1'); // indicator 1
+getValuesBySpec(record, 'LDR/6'); // leader character range
+
+const matches = getBySpec(record, '650$x');
+// [{ tag: '650', occurrence: 0, subfieldCode: 'x', value: '...' }, ...]
+
+const ast = parseMarcSpec('245$a/0-2'); // parse without evaluating
+```
+
+Implements the field/subfield addressing subset of the [MARCspec](https://marcspec.github.io/MARCspec/) standard: tags (incl. `.` wildcards and `LDR`), subfield codes and ranges (`$a-c`), character ranges (`/1-3`, `/#` for last), 0-indexed field/subfield occurrences (`[0]`, `[#]` for last), and indicators (`^1`, `^2`). Comparison/predicate subspecs (e.g. `020$c{?020$a}`) are not supported and throw `MarcSpecParseError`. A spec that's syntactically valid but matches nothing returns `[]`.
 
 ---
 
@@ -185,17 +219,23 @@ All operations return new objects — originals are never mutated.
 
 ```typescript
 import {
-  appendField, insertFieldBefore, insertFieldAfter, insertGroupedField,
-  removeFields, removeField,
-  addSubfield, removeSubfield, replaceSubfield,
+  appendField,
+  insertFieldBefore,
+  insertFieldAfter,
+  insertGroupedField,
+  removeFields,
+  removeField,
+  addSubfield,
+  removeSubfield,
+  replaceSubfield,
 } from 'marc-ts';
 
 const r1 = appendField(record, newField);
 const r2 = insertFieldBefore(record, '700', newField);
 const r3 = insertFieldAfter(record, '245', newField);
-const r4 = insertGroupedField(record, newField);  // maintains MARC tag order
+const r4 = insertGroupedField(record, newField); // maintains MARC tag order
 const r5 = removeFields(record, '650');
-const r6 = removeField(record, specificField);     // reference equality
+const r6 = removeField(record, specificField); // reference equality
 
 const f1 = addSubfield(field, 'b', 'Subtitle');
 const f2 = removeSubfield(field, 'x');
@@ -210,8 +250,8 @@ const f3 = replaceSubfield(field, 'a', 'New value');
 import { cloneRecord, recordsEqual, fieldsEqual } from 'marc-ts';
 
 const copy = cloneRecord(record);
-recordsEqual(a, b);              // strict field order
-recordsEqual(a, b, true);        // ignore field order
+recordsEqual(a, b); // strict field order
+recordsEqual(a, b, true); // ignore field order
 fieldsEqual(field1, field2);
 ```
 
@@ -220,8 +260,16 @@ fieldsEqual(field1, field2);
 ## Types
 
 ```typescript
-import type { MarcRecord, ControlField, DataField, Subfield,
-              ParseOptions, SerializeOptions, MarcWarning, MarcWarningType } from 'marc-ts';
+import type {
+  MarcRecord,
+  ControlField,
+  DataField,
+  Subfield,
+  ParseOptions,
+  SerializeOptions,
+  MarcWarning,
+  MarcWarningType,
+} from 'marc-ts';
 ```
 
 ---
