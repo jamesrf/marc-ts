@@ -15,7 +15,34 @@ describe('MARCspec Querying', () => {
         indicator2: '0',
         subfields: [
           { code: 'a', value: 'The Catcher in the Rye /' },
+          { code: 'b', value: 'a novel /' },
           { code: 'c', value: 'J.D. Salinger.' },
+        ],
+      },
+      {
+        tag: '020',
+        indicator1: ' ',
+        indicator2: ' ',
+        subfields: [
+          { code: 'a', value: '9780316769488' },
+          { code: 'q', value: 'hardcover' },
+          { code: 'c', value: '$25.00' },
+          { code: 'z', value: '9780000000000' },
+        ],
+      },
+      {
+        tag: '020',
+        indicator1: ' ',
+        indicator2: ' ',
+        subfields: [{ code: 'z', value: '9780000000001' }],
+      },
+      {
+        tag: '020',
+        indicator1: ' ',
+        indicator2: ' ',
+        subfields: [
+          { code: 'q', value: 'paperback' },
+          { code: 'c', value: '$12.00' },
         ],
       },
       {
@@ -160,9 +187,83 @@ describe('MARCspec Querying', () => {
       }
     });
 
-    it('throws MarcSpecParseError for an unsupported predicate subspec', () => {
-      expect(() => parseMarcSpec('020$c{?020$a}')).toThrow(MarcSpecParseError);
-      expect(() => parseMarcSpec('020$c{?020$a}')).toThrow(/not supported/i);
+    it('parses a predicate subspec with explicit operator and tag', () => {
+      expect(parseMarcSpec('020$c{?020$a}')).toMatchObject({
+        tag: '020',
+        subfieldCodes: ['c'],
+        subSpecs: [
+          {
+            subTermSets: [
+              {
+                left: undefined,
+                operator: '?',
+                right: { kind: 'spec', spec: { tag: '020', subfieldCodes: ['a'] } },
+              },
+            ],
+          },
+        ],
+      });
+    });
+
+    it('parses an abbreviated subspec term identically to its fully-qualified form', () => {
+      expect(parseMarcSpec('020$c{$a}')).toEqual(parseMarcSpec('020$c{?020$a}'));
+    });
+
+    it('parses a subspec with an omitted operator (defaults to "?")', () => {
+      expect(parseMarcSpec('020$c{020$a}')).toEqual(parseMarcSpec('020$c{?020$a}'));
+    });
+
+    it('parses a "!" (not exists) predicate subspec', () => {
+      expect(parseMarcSpec('020$z{!020$a}')).toMatchObject({
+        subSpecs: [{ subTermSets: [{ left: undefined, operator: '!', right: { kind: 'spec' } }] }],
+      });
+    });
+
+    it('parses an OR ("|") of comparison subterms', () => {
+      const ast = parseMarcSpec('020$c{$q=\\paperback|$q=\\hardcover}');
+      expect(ast.subSpecs).toHaveLength(1);
+      expect(ast.subSpecs?.[0].subTermSets).toEqual([
+        {
+          left: { kind: 'spec', spec: { tag: '020', subfieldCodes: ['q'] } },
+          operator: '=',
+          right: { kind: 'string', value: 'paperback' },
+        },
+        {
+          left: { kind: 'spec', spec: { tag: '020', subfieldCodes: ['q'] } },
+          operator: '=',
+          right: { kind: 'string', value: 'hardcover' },
+        },
+      ]);
+    });
+
+    it('parses AND ("{...}{...}") of adjacent subspecs', () => {
+      const ast = parseMarcSpec('008/18{LDR/6=\\a}{LDR/7=\\a|LDR/7=\\c}');
+      expect(ast.subSpecs).toHaveLength(2);
+    });
+
+    it('parses comparison string escapes, including "\\s" as a space', () => {
+      const ast = parseMarcSpec('020$c{$q=\\Sub\\sA\\$\\{\\}}');
+      expect(ast.subSpecs?.[0].subTermSets[0].right).toEqual({ kind: 'string', value: 'Sub A${}' });
+    });
+
+    it('throws MarcSpecParseError for an empty subspec', () => {
+      expect(() => parseMarcSpec('020$c{}')).toThrow(MarcSpecParseError);
+    });
+
+    it('throws MarcSpecParseError for an unterminated subspec', () => {
+      expect(() => parseMarcSpec('020$c{?020$a')).toThrow(MarcSpecParseError);
+    });
+
+    it('throws MarcSpecParseError for an unescaped operator character in a comparison string', () => {
+      expect(() => parseMarcSpec('020$c{$q=\\paper=back}')).toThrow(MarcSpecParseError);
+    });
+
+    it('throws MarcSpecParseError for an invalid escape sequence in a comparison string', () => {
+      expect(() => parseMarcSpec('020$c{$q=\\pa\\xper}')).toThrow(MarcSpecParseError);
+    });
+
+    it('throws MarcSpecParseError for a nested subspec-in-subspec', () => {
+      expect(() => parseMarcSpec('020$c{$a{$b}}')).toThrow(MarcSpecParseError);
     });
   });
 
@@ -280,8 +381,107 @@ describe('MARCspec Querying', () => {
       expect(() => getBySpec(testRecord, '24')).toThrow(MarcSpecParseError);
     });
 
-    it('propagates MarcSpecParseError for unsupported predicate specs', () => {
-      expect(() => getBySpec(testRecord, '020$c{?020$a}')).toThrow(MarcSpecParseError);
+    it('resolves an existence-check predicate, keeping only occurrences with the referenced sibling', () => {
+      // Occurrence 0 has both $a and $c -> kept; occurrence 2 has $c but no $a -> filtered out.
+      expect(getValuesBySpec(testRecord, '020$c{?020$a}')).toEqual(['$25.00']);
+    });
+
+    it('resolves a negated existence-check predicate', () => {
+      // Occurrence 0 has $z but also has $a -> filtered out; occurrence 1 has $z and no $a -> kept.
+      expect(getValuesBySpec(testRecord, '020$z{!020$a}')).toEqual(['9780000000001']);
+    });
+
+    it('resolves an OR of equality comparisons against literal strings', () => {
+      // Occurrence 0 ($q=hardcover) and occurrence 2 ($q=paperback) both satisfy the OR.
+      expect(getValuesBySpec(testRecord, '020$c{$q=\\paperback|$q=\\hardcover}')).toEqual([
+        '$25.00',
+        '$12.00',
+      ]);
+    });
+
+    it('resolves an AND of adjacent subspecs referencing LDR', () => {
+      const record: MarcRecord = {
+        ...testRecord,
+        leader: '00000nac a2200000 a 4500', // LDR/6 = 'a', LDR/7 = 'c'
+      };
+      expect(getValuesBySpec(record, '008/18{LDR/6=\\a}{LDR/7=\\a|LDR/7=\\c}')).toEqual(['|']);
+    });
+
+    it('returns an empty array when one of several AND-ed subspecs fails', () => {
+      const record: MarcRecord = {
+        ...testRecord,
+        leader: '00000nax a2200000 a 4500', // LDR/6 = 'a', LDR/7 = 'x' (fails second clause)
+      };
+      expect(getBySpec(record, '008/18{LDR/6=\\a}{LDR/7=\\a|LDR/7=\\c}')).toEqual([]);
+    });
+
+    it('resolves a cross-tag OR predicate attached to a subfieldSpec', () => {
+      // 007 data is 'ta', so 007/0 = 't', matching the second OR branch.
+      expect(getValuesBySpec(testRecord, '245$b{007/0=\\a|007/0=\\t}')).toEqual(['a novel /']);
+    });
+
+    it('returns an empty array when no occurrence satisfies the subspec', () => {
+      expect(getBySpec(testRecord, '020$a{020$q=\\imaginary}')).toEqual([]);
+    });
+
+    it('distinguishes "=" (equal) from "~" (includes) semantics', () => {
+      const record: MarcRecord = {
+        leader: testRecord.leader,
+        fields: [
+          {
+            tag: '020',
+            indicator1: ' ',
+            indicator2: ' ',
+            subfields: [
+              { code: 'a', value: 'value' },
+              { code: 'q', value: 'a substring of value' },
+            ],
+          },
+        ],
+      };
+      expect(getValuesBySpec(record, '020$a{$q=\\value}')).toEqual([]); // not exactly equal
+      expect(getValuesBySpec(record, '020$a{$q~\\value}')).toEqual(['value']); // substring match
+    });
+
+    it('evaluates "!=" and "!~" as the negation of "=" / "~" (no matching pair), not existential inequality', () => {
+      const record: MarcRecord = {
+        leader: testRecord.leader,
+        fields: [
+          {
+            tag: '020',
+            indicator1: ' ',
+            indicator2: ' ',
+            subfields: [
+              { code: 'a', value: 'same' },
+              { code: 'q', value: 'same' },
+            ],
+          },
+        ],
+      };
+      // left ($a='same') and right ($q='same') match exactly -> '!=' is false, '!~' is false.
+      expect(getBySpec(record, '020$a{$a!=$q}')).toEqual([]);
+      expect(getBySpec(record, '020$a{$a!~$q}')).toEqual([]);
+    });
+
+    it('propagates MarcSpecParseError for malformed subspecs', () => {
+      expect(() => getBySpec(testRecord, '020$c{}')).toThrow(MarcSpecParseError);
+    });
+
+    it('resolves a subspec whose nested subTerm references an indicator', () => {
+      // 245's indicator1 is '1', so this keeps the field; a non-matching value filters it out.
+      expect(getValuesBySpec(testRecord, '245$a{^1=\\1}')).toEqual(['The Catcher in the Rye /']);
+      expect(getValuesBySpec(testRecord, '245$a{^1=\\9}')).toEqual([]);
+    });
+
+    it('returns an empty array when a subspec attached to LDR is false', () => {
+      expect(getBySpec(testRecord, 'LDR/6{LDR/6=\\z}')).toEqual([]);
+      expect(getValuesBySpec(testRecord, 'LDR/6{LDR/6=\\a}')).toEqual(['a']);
+    });
+
+    it('does not mutate the input record when evaluating a subspec', () => {
+      const before = JSON.parse(JSON.stringify(testRecord));
+      getBySpec(testRecord, '020$c{?020$a}');
+      expect(testRecord).toEqual(before);
     });
   });
 

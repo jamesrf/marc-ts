@@ -207,9 +207,21 @@ const matches = getBySpec(record, '650$x');
 // [{ tag: '650', occurrence: 0, subfieldCode: 'x', value: '...' }, ...]
 
 const ast = parseMarcSpec('245$a/0-2'); // parse without evaluating
+
+// Predicate subspecs ("{...}") filter which occurrences match:
+getValuesBySpec(record, '020$c{?020$a}'); // keep $c only where a sibling $a exists
+getValuesBySpec(record, '020$z{!020$a}'); // keep $z only where no sibling $a exists
+getValuesBySpec(record, '020$c{$q=\\paperback|$q=\\hardcover}'); // OR
+getValuesBySpec(record, '008/18{LDR/6=\\a}{LDR/7=\\a|LDR/7=\\c}'); // AND (adjacent subspecs)
 ```
 
-Implements the field/subfield addressing subset of the [MARCspec](https://marcspec.github.io/MARCspec/) standard: tags (incl. `.` wildcards and `LDR`), subfield codes and ranges (`$a-c`), character ranges (`/1-3`, `/#` for last), 0-indexed field/subfield occurrences (`[0]`, `[#]` for last), and indicators (`^1`, `^2`). Comparison/predicate subspecs (e.g. `020$c{?020$a}`) are not supported and throw `MarcSpecParseError`. A spec that's syntactically valid but matches nothing returns `[]`.
+Implements the field/subfield addressing subset of the [MARCspec](https://marcspec.github.io/MARCspec/) standard: tags (incl. `.` wildcards and `LDR`), subfield codes and ranges (`$a-c`), character ranges (`/1-3`, `/#` for last), 0-indexed field/subfield occurrences (`[0]`, `[#]` for last), and indicators (`^1`, `^2`). A spec that's syntactically valid but matches nothing returns `[]`.
+
+Also implements comparison/predicate subspecs (`{...}`), which filter which occurrences of the attached field/subfield/indicator spec are kept:
+- **Operators**: `=` (equal), `!=` (unequal), `~` (includes/substring), `!~` (not includes), `?` (exists), `!` (not exists). `?`/`!` are unary (test the right-hand operand only); the rest compare a left and right operand.
+- **Operands** can be a literal string (`\`-escaped — reserved characters `$ { } ! = ~ ? |` must be escaped, and a literal space is written `\s`), or a nested field/subfield/indicator spec, which is cross-referenced against the record. A nested spec can use **abbreviation** shorthand, omitting the tag to inherit it from the spec the subspec is attached to (`020$c{$a}` is shorthand for `020$c{020$a}`). A same-tag or abbreviated reference with no explicit occurrence index is scoped to the *same field occurrence* the outer spec is currently on (e.g. `020$c{?020$a}` checks for a sibling `$a` within the same `020` instance); a different tag, or an explicit index, resolves independently against the whole record.
+- Omitting the operator defaults it to `?` (existence), and `left` to the spec's own base (e.g. `020$c{020$a}` is equivalent to `020$c{?020$a}`).
+- Multiple `subTermSet`s separated by `|` inside one `{...}` are OR'd together; adjacent `{...}{...}` subspecs are AND'd together.
 
 ---
 
